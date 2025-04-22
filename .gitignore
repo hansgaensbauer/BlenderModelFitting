@@ -30,4 +30,4 @@ fp-info-cache
 *.xml
 *.csv
 
-/pytorch3d/*
+pytorch3d/
