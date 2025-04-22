@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>My Blog Post</title>
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      max-width: 700px;
+      margin: 2rem auto;
+      padding: 1rem;
+      line-height: 1.6;
+      background-color: #f9f9f9;
+      color: #333;
+    }
+
+    h1, h2, h3 {
+      line-height: 1.2;
+      color: #222;
+    }
+
+    a {
+      color: #007acc;
+      text-decoration: none;
+    }
+
+    a:hover {
+      text-decoration: underline;
+    }
+
+    blockquote {
+      margin: 1rem 0;
+      padding: 0.5rem 1rem;
+      border-left: 4px solid #ccc;
+      background-color: #fff;
+    }
+
+    code {
+      background: #eee;
+      padding: 0.2em 0.4em;
+      border-radius: 4px;
+      font-family: monospace;
+    }
+
+    pre {
+      background: #eee;
+      padding: 1em;
+      overflow-x: auto;
+      border-radius: 4px;
+    }
+
+    img {
+      max-width: 100%;
+      height: auto;
+    }
+
+    footer {
+      margin-top: 4rem;
+      text-align: center;
+      font-size: 0.9em;
+      color: #777;
+    }
+  </style>
+</head>
+<body>
+  <article>
+    <h1>Single Image Reconstruction with Explicitly Parameterized Latent Spaces</h1>
+   
+    <p><em>By Hans Gaensbauer • April 21, 2025</em></p>
+    <h2>Introduction</h2>
+    <p>
+        Single image reconstruction is generally under-constrained, since the 2D projection implicit in the creation of
+        the image destroys information about depth. However, for some applications, prior information about the 3D
+        geometry drastically reduces the number of parameters required to completely describe the scene. For
+        example, in industrial settings when computer vision is to be used to perform measurements (for verification)
+        or localization (for pick and place) on parts that have a well understood but unknown shape. In these cases,
+        general purpose latent representations are too general to elegantly capture the prior geometric information,
+        but classical template matching may require too much manual fine-tuning or insufficient accuracy for the
+        application[1].
+    </p>
+    <p>
+        I propose to use OpenSCAD scripts as 3D representations for parametric models to explicitly define a
+        parameterization of the 3D scene. OpenSCAD is a well-known text-based 3D modelling program that is widely
+        used to create “customizable” models where a few key variables are explicitly defined. By replacing the
+        OpenSCAD renderer with a differential renderer, I can recover these model parameters from an image by
+        performing gradient descent on the model parameters and pose through the differentiable renderer similar to
+        the reconstruction training approach described in [2], [3]. A nice example of this approach to recover the pose
+        of a completely defined mesh is given in [4].
+    </p>
+    <p>
+        There is a significant body of work that uses deformable 3D models (or large databases of 3D models) to fit
+        meshes and extract the pose of target objects from a single photo[5], [6], [7], [8], [9], [10], [11]. The proposed
+        approach has orders of magnitude fewer optimization parameters because I am optimizing a small number of
+        user-specified parameters rather than the position of every point on the mesh. The handful of papers that do
+        use explicitly defined low-dimensional 3D parameterizations are application specific and therefore use
+        training/inference techniques that do not attempt to completely describe the 3D object [12],[13]. On the
+        other end of the spectrum, the proposed project has a lot in common with classical approaches to object
+        matching using user-specified models, with the important difference that these template-matching
+        algorithms do not leverage a differentiable renderer for gradient-descent on the image data [14], [15].
+    </p>
+    <p>
+        I will aim to compare reconstruction using explicitly parameterized models for surface mounted integrated
+        circuits, fasteners, and spur gears to conventional 3D reconstruction techniques using more general latent
+        representations to answer the following questions:
+        <ol>
+            <li>For a given accuracy, how does the size and speed of explicitly parameterized reconstruction
+                compare to traditional methods?</li>
+            <li>Does explicitly parameterized reconstruction generalize to real-world input images better than
+                    conventional mesh fitting? Specifically, how does the accuracy on a test set of real images compare?</li>
+            <li>Are results consistent across object type? What types of parameterizations are allowable? (it seems
+                        likely that affine transformations will work better than parameterizations that change, for example,
+                        the number or arrangement of certain features).</li>
+        </ol>
+    </p>
+    <p>
+        Finally, to assess whether this approach is simpler to set up than template matching with a parameterized
+        template, I will also implement a classical template matching pipeline for these objects and discuss the
+        amount of fine-tuning required to use the two approaches for different classes of objects.
+    </p>
+    <h2>Conventional Object Tracking with OpenCV</h2>
+    <h2>Mesh Fitting with Differential Rendering</h2>
+    <h2>The Problem with External Modelling Programs</h2>
+    <h2>Blender Transforms</h2>
+    <h2>Implementing A Pytorch Pipeline</h2>
+    <h2>Parameterized Mesh Fitting</h2>
+    <h2>More Complex Meshes</h2>
+    <h2>Comparison to Existing Techniques</h2>
+    <h2>Conclusion</h2>
+    <p></p>
+    <p>Here’s a paragraph with a <code>code snippet</code> and a blockquote:</p>
+
+    <blockquote>
+      "This is a sample quote that adds emphasis to your content."
+    </blockquote>
+
+    <h3>Code Example</h3>
+    <pre><code>const hello = "world";
+console.log(hello);</code></pre>
+    <h2>References</h2>
+    <ol>
+        <li>D. Shin, C. C. Fowlkes, and D. Hoiem, “Pixels, Voxels, and Views: A Study of Shape Representations for Single View 3D Object Shape Prediction,” in <i>2018 IEEE/CVF Conference on Computer Vision and Pattern Recognition</i>, Salt Lake City, UT: IEEE, Jun. 2018, pp. 3061–3069. doi: <a href="https://doi.org/10.1109/CVPR.2018.00323">10.1109/CVPR.2018.00323</a>.</li>
+        <li>S. Popov, P. Bauszat, and V. Ferrari, “CoReNet: Coherent 3D scene reconstruction from a single RGB image,” Aug. 05, 2020, <i>arXiv</i>: arXiv:2004.12989. doi: <a href="https://doi.org/10.48550/arXiv.2004.12989">10.48550/arXiv.2004.12989</a>.</li>
+        <li>P. Henderson and V. Ferrari, “Learning single-image 3D reconstruction by generative modelling of shape, pose and shading,” Aug. 26, 2019, <i>arXiv</i>: arXiv:1901.06447. doi: <a href="https://doi.org/10.48550/arXiv.1901.06447">10.48550/arXiv.1901.06447</a>.</li>
+        <li>A. Chan, “Adventures with Differentiable Mesh Rendering,” <i>Distill</i>. Accessed: Apr. 08, 2025. [Online]. Available: <a href="http://andrewkchan.dev/">http://andrewkchan.dev/</a></li>
+        <li>N. Kholgade, T. Simon, A. Efros, and Y. Sheikh, “3D object manipulation in a single photograph using stock 3D models,” <i>ACM Trans. Graph.</i>, vol. 33, no. 4, pp. 1–12, Jul. 2014. doi: <a href="https://doi.org/10.1145/2601097.2601209">10.1145/2601097.2601209</a>.</li>
+        <li>J. J. Lim, A. Khosla, and A. Torralba, “FPM: Fine Pose Parts-Based Model with 3D CAD Models,” in <i>Computer Vision – ECCV 2014</i>, vol. 8694, D. Fleet, T. Pajdla, B. Schiele, and T. Tuytelaars, Eds., Lecture Notes in Computer Science, Cham: Springer, 2014, pp. 478–493. doi: <a href="https://doi.org/10.1007/978-3-319-10599-4_31">10.1007/978-3-319-10599-4_31</a>.</li>
+        <li>K. Rematas, T. Ritschel, M. Fritz, and T. Tuytelaars, “Image-Based Synthesis and Re-synthesis of Viewpoints Guided by 3D Models,” in <i>2014 IEEE Conference on Computer Vision and Pattern Recognition</i>, Columbus, OH, USA: IEEE, Jun. 2014, pp. 3898–3905. doi: <a href="https://doi.org/10.1109/CVPR.2014.498">10.1109/CVPR.2014.498</a>.</li>
+        <li>M. Aubry, D. Maturana, A. A. Efros, B. C. Russell, and J. Sivic, “Seeing 3D Chairs: Exemplar Part-Based 2D-3D Alignment Using a Large Dataset of CAD Models,” in <i>2014 IEEE Conference on Computer Vision and Pattern Recognition</i>, Jun. 2014, pp. 3762–3769. doi: <a href="https://doi.org/10.1109/CVPR.2014.487">10.1109/CVPR.2014.487</a>.</li>
+        <li>C. B. Choy, M. Stark, S. Corbett-Davies, and S. Savarese, “Enriching object detection with 2D-3D registration and continuous viewpoint estimation,” in <i>2015 IEEE Conference on Computer Vision and Pattern Recognition (CVPR)</i>, Boston, MA, USA: IEEE, Jun. 2015, pp. 2512–2520. doi: <a href="https://doi.org/10.1109/CVPR.2015.7298866">10.1109/CVPR.2015.7298866</a>.</li>
+        <li>J. Rock, T. Gupta, J. Thorsen, J. Gwak, D. Shin, and D. Hoiem, “Completing 3D object shape from one depth image,” in <i>2015 IEEE Conference on Computer Vision and Pattern Recognition (CVPR)</i>, Boston, MA, USA: IEEE, Jun. 2015, pp. 2484–2493. doi: <a href="https://doi.org/10.1109/CVPR.2015.7298863">10.1109/CVPR.2015.7298863</a>.</li>
+        <li>M. Yavartanoo, J. Chung, R. Neshatavar, and K. M. Lee, “3DIAS: 3D Shape Reconstruction with Implicit Algebraic Surfaces,” Aug. 19, 2021, <i>arXiv</i>: arXiv:2108.08653. doi: <a href="https://doi.org/10.48550/arXiv.2108.08653">10.48550/arXiv.2108.08653</a>.</li>
+        <li>K. Genova, F. Cole, A. Maschinot, A. Sarna, D. Vlasic, and W. T. Freeman, “Unsupervised Training for 3D Morphable Model Regression,” in <i>2018 IEEE/CVF Conference on Computer Vision and Pattern Recognition</i>, Salt Lake City, UT, USA: IEEE, Jun. 2018, pp. 8377–8386. doi: <a href="https://doi.org/10.1109/CVPR.2018.00874">10.1109/CVPR.2018.00874</a>.</li>
+        <li>M. Z. Zia, M. Stark, B. Schiele, and K. Schindler, “Detailed 3D Representations for Object Recognition and Modeling,” <i>IEEE Trans. Pattern Anal. Mach. Intell.</i>, vol. 35, no. 11, pp. 2608–2623, Nov. 2013. doi: <a href="https://doi.org/10.1109/TPAMI.2013.87">10.1109/TPAMI.2013.87</a>.</li>
+        <li>D. Roller, K. Daniilidis, and H. H. Nagel, “Model-based object tracking in monocular image sequences of road traffic scenes,” <i>Int. J. Comput. Vis.</i>, vol. 10, no. 3, pp. 257–281, Jun. 1993. doi: <a href="https://doi.org/10.1007/BF01539538">10.1007/BF01539538</a>.</li>
+        <li>L. G. Roberts, “Machine perception of three-dimensional solids,” Thesis, Massachusetts Institute of Technology, 1963. Accessed: Apr. 08, 2025. [Online]. Available: <a href="https://dspace.mit.edu/handle/1721.1/11589">https://dspace.mit.edu/handle/1721.1/11589</a></li>
+      </ol>
+      
+    <p>That’s it! Feel free to customize and expand on this template for your needs.</p>
+  </article>
+
+  <footer>
+    &copy; 2025 Your Name or Blog Title
+  </footer>
+</body>
+</html>
