@@ -20,8 +20,6 @@ if torch.cuda.is_available():
 else:
     device = torch.device("cpu")
 
-temp = "C:/Users/hangaen/AppData/Local/Temp/"
-
 bpy.ops.wm.open_mainfile(filepath="shapekey_demo.blend")
 
 # Camera and lights (customize if needed)

@@ -1,5 +1,15 @@
 import bpy
 import torch
+import matplotlib.pyplot as plt
+import numpy as np
+from pytorch3d.structures import Meshes
+from pytorch3d.renderer import (
+    RasterizationSettings, MeshRenderer, MeshRasterizer, SoftPhongShader,
+    PerspectiveCameras, PointLights, TexturesVertex, look_at_view_transform
+)
+
+from tqdm import tqdm 
+from einops import einsum
 
 if torch.cuda.is_available():
     device = torch.device("cuda:0")
@@ -9,6 +19,47 @@ else:
     device = torch.device("cpu")
 
 bpy.ops.wm.open_mainfile(filepath="transform_driver_demo.blend")
+# Camera and lights (customize if needed)
+R, T = look_at_view_transform(dist=5, elev=45, azim=45)
+cameras = PerspectiveCameras(R=R, T=T, device=device)
+lights = PointLights(device=device, location=[[0.0, 0.0, -3.0]])
+
+# Basic renderer
+renderer = MeshRenderer(
+    rasterizer=MeshRasterizer(
+        cameras=cameras,
+        raster_settings=RasterizationSettings(image_size=512)
+    ),
+    shader=SoftPhongShader(device=device, cameras=cameras, lights=lights)
+)
+
+cube = bpy.data.objects["Target"]
+
+#Render and show the target mesh (no rotation or scale)
+depsgraph = bpy.context.evaluated_depsgraph_get()
+
+# Get the evaluated version of the object (including modifiers, constraints, etc.)
+eval_cube = cube.evaluated_get(depsgraph).to_mesh()
+
+faces = np.array([[v for v in poly.vertices] for poly in cube.data.polygons], dtype=np.int32)
+verts = np.array([v.co[:] for v in cube.data.vertices], dtype=np.float32)
+print(np.shape(verts))
+#transform by world matrix
+verts_tx = np.array([cube.matrix_world @ v.co for v in eval_cube.vertices])
+print(np.shape(verts_tx))
+# verts_tx = np.array([v.co[:] for v in (cube.matrix_world @ cube.data.vertices[:])], dtype=np.float32)
+verts_tensor = torch.tensor(verts[np.newaxis,:,:], dtype=torch.float32, device=device)  # shape (1, V, 3)
+verts_tensor_tx = torch.tensor(verts_tx[np.newaxis,:,:], dtype=torch.float32, device=device)  # shape (1, V, 3)
+faces_tensor = torch.tensor(faces[np.newaxis,:,:], dtype=torch.int64, device=device)    # shape (1, F, 3)
+color = torch.tensor([0.8, 0.8, 0.8], device=verts_tensor.device)  # light gray
+vertex_colors = color[None, None, :].expand(verts_tensor.shape)    # (1, V, 3)
+textures = TexturesVertex(verts_features=vertex_colors)
+mesh = Meshes(verts=verts_tensor_tx, faces=faces_tensor, textures=textures)
+target_image = renderer(mesh)
+
+plt.imshow(target_image[0].cpu().numpy())  # Only show the first image in the batch
+plt.axis("off")
+plt.show()
 
 # 1. Extract all of the custom properties from the empty control object
 control = bpy.data.objects["Control"]
@@ -21,10 +72,14 @@ if control is not None:
 
 #Assign each of the custom properties to custom variables
 def initialize_params(custom_props):
-    params_assign_string = ""
+    params_assign_string = "global opt_props\n"
+    params_assign_string += "opt_props = []\n"
     for prop in custom_props:
         params_assign_string += f"global {prop}\n"
         params_assign_string += f"{prop} = torch.tensor([{custom_props[prop]}], device=device, requires_grad=True)\n"
+        params_assign_string += f"opt_props.append({prop})\n"
+        
+    print(params_assign_string)
     exec(params_assign_string)
 
 initialize_params(custom_props)
@@ -56,21 +111,19 @@ else:
     print("No drivers on this object.")
 
 # 3. Evaluate each driver using the custom properties as dependencies
-location = torch.tensor([0,0,0], dtype=float)
-rotation_euler = torch.tensor([0,0,0], dtype=float)
-scale = torch.tensor([0,0,0], dtype=float)
+
 
 def get_transform_update_string(drivers):
     vstr = "def update_transform():\n"
     for driver in drivers:
-        vstr += f"\tglobal {driver}\n"
+        vstr += f"\t{driver} = torch.zeros(3, device=device)\n"
         for axis in range(3):
             vars = drivers[driver][axis]["vars"]
             for var in vars:
                 vstr += f"\t{var} = {vars[var][2:-2]}\n"
+            vstr
             exp = drivers[driver][axis]["exp"]
             vstr += f"\t{driver}[{axis}] = {exp}\n"
-        # vstr += f"\t{driver} = torch.tensor({driver})\n"
     vstr += "\treturn build_transform(location, rotation_euler, scale)\n"
     return vstr
 
@@ -78,37 +131,72 @@ print(get_transform_update_string(drivers))
 
 # 4. Compute the transform matrix using the drivers
 def build_transform(location, rotation, scale):
-    lx, ly, lz = location
-    sx, sy, sz = scale
+
     cx, cy, cz = torch.cos(rotation)
     sxr, syr, szr = torch.sin(rotation)
 
-    Rx = torch.tensor([
-        [1, 0, 0],
-        [0, cx, -sxr],
-        [0, sxr, cx]
-    ])
+    ones = torch.ones((), device=device)
+    zeros = torch.zeros((), device=device)
 
-    Ry = torch.tensor([
-        [cy, 0, syr],
-        [0, 1, 0],
-        [-syr, 0, cy]
-    ])
+    Rx = torch.stack([
+        torch.stack([ones, zeros, zeros], dim=-1),
+        torch.stack([zeros, cx, -sxr], dim=-1),
+        torch.stack([zeros, sxr, cx], dim=-1)
+    ], dim=0)
 
-    Rz = torch.tensor([
-        [cz, -szr, 0],
-        [szr, cz, 0],
-        [0, 0, 1]
-    ])
+    Ry = torch.stack([
+        torch.stack([cy, zeros, syr], dim=-1),
+        torch.stack([zeros, ones, zeros], dim=-1),
+        torch.stack([-syr, zeros, cy], dim=-1)
+    ], dim=0)
+
+    Rz = torch.stack([
+        torch.stack([cz, -szr, zeros], dim=-1),
+        torch.stack([szr, cz, zeros], dim=-1),
+        torch.stack([zeros, zeros, ones], dim=-1)
+    ], dim=0)
+
     R = Rz @ Ry @ Rx
-    S = torch.diag(torch.tensor([sx, sy, sz]))
+
+    S = torch.diag(torch.stack([scale[0], scale[1], scale[2]]))
     RS = R @ S
 
-    M = torch.eye(4)
-    M[:3, :3] = RS
-    M[:3, 3] = torch.tensor([lx, ly, lz])
+    loc = location.view(3, 1)
+    upper = torch.cat([RS, loc], dim=1)
+    
+    return upper.to(dtype=torch.float32)
 
-    return M
 
 exec(get_transform_update_string(drivers))
-print(update_transform())
+# def update_transform(): 
+#         location = torch.zeros(3, device=device)
+#         rotation_euler = torch.zeros(3, device=device)
+#         rotation_euler[0] = 0.3*scale1
+#         scale = torch.ones(3, device=device)
+#         scale[0] = 2*scale1
+#         return build_transform(location, rotation_euler, scale)
+print(get_transform_update_string(drivers))
+
+# location = torch.zeros(3, device=device)
+# rotation_euler = torch.zeros(3, device=device)
+# scale = torch.ones(3, device=device)
+
+#Optimize
+print(verts_tensor.shape)
+optimizer = torch.optim.Adam(opt_props, lr=0.1)
+with tqdm(range(100)) as titer:
+    for i in titer:
+        optimizer.zero_grad()
+        matrix_world = update_transform()
+
+        ones = torch.ones(verts_tensor.shape[0], verts_tensor.shape[1], 1, device=verts_tensor.device)
+        nverts = einsum(torch.cat([verts_tensor, ones], dim=-1), matrix_world,'b i v, j v-> b i j')
+        mesh = Meshes(verts=nverts, faces=faces_tensor, textures=textures)
+        cimage = renderer(mesh)
+
+        loss = torch.sum((cimage - target_image)**2)
+ 
+        loss.backward()
+        optimizer.step()
+        titer.set_postfix(loss=loss.item(), scale1=opt_props[0].item())
+    
