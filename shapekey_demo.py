@@ -22,7 +22,7 @@ else:
 
 temp = "C:/Users/hangaen/AppData/Local/Temp/"
 
-bpy.ops.wm.open_mainfile(filepath="my.blend")
+bpy.ops.wm.open_mainfile(filepath="shapekey_demo.blend")
 
 # Camera and lights (customize if needed)
 R, T = look_at_view_transform(dist=5, elev=90, azim=0)

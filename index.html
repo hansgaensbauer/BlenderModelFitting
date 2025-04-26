@@ -1,164 +1,505 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>My Blog Post</title>
-  <style>
-    body {
-      font-family: system-ui, sans-serif;
-      max-width: 700px;
-      margin: 2rem auto;
-      padding: 1rem;
-      line-height: 1.6;
-      background-color: #f9f9f9;
-      color: #333;
-    }
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Parameterized Reconstruction</title>
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        max-width: 700px;
+        margin: 2rem auto;
+        padding: 1rem;
+        line-height: 1.6;
+        background-color: #f9f9f9;
+        color: #333;
+      }
 
-    h1, h2, h3 {
-      line-height: 1.2;
-      color: #222;
-    }
+      h1,
+      h2,
+      h3 {
+        line-height: 1.2;
+        color: #222;
+      }
 
-    a {
-      color: #007acc;
-      text-decoration: none;
-    }
+      a {
+        color: #007acc;
+        text-decoration: none;
+      }
 
-    a:hover {
-      text-decoration: underline;
-    }
+      a:hover {
+        text-decoration: underline;
+      }
 
-    blockquote {
-      margin: 1rem 0;
-      padding: 0.5rem 1rem;
-      border-left: 4px solid #ccc;
-      background-color: #fff;
-    }
+      blockquote {
+        margin: 1rem 0;
+        padding: 0.5rem 1rem;
+        border-left: 4px solid #ccc;
+        background-color: #fff;
+      }
 
-    code {
-      background: #eee;
-      padding: 0.2em 0.4em;
-      border-radius: 4px;
-      font-family: monospace;
-    }
+      code {
+        background: #eee;
+        padding: 0.2em 0.4em;
+        border-radius: 4px;
+        font-family: monospace;
+      }
 
-    pre {
-      background: #eee;
-      padding: 1em;
-      overflow-x: auto;
-      border-radius: 4px;
-    }
+      pre {
+        background: #eee;
+        padding: 1em;
+        overflow-x: auto;
+        border-radius: 4px;
+      }
 
-    img {
-      max-width: 100%;
-      height: auto;
-    }
+      img {
+        max-width: 100%;
+        height: auto;
+      }
 
-    footer {
-      margin-top: 4rem;
-      text-align: center;
-      font-size: 0.9em;
-      color: #777;
-    }
-  </style>
-</head>
-<body>
-  <article>
-    <h1>Single Image Reconstruction with Explicitly Parameterized Latent Spaces</h1>
-   
-    <p><em>By Hans Gaensbauer • April 21, 2025</em></p>
-    <h2>Introduction</h2>
-    <p>
-        Single image reconstruction is generally under-constrained, since the 2D projection implicit in the creation of
-        the image destroys information about depth. However, for some applications, prior information about the 3D
-        geometry drastically reduces the number of parameters required to completely describe the scene. For
-        example, in industrial settings when computer vision is to be used to perform measurements (for verification)
-        or localization (for pick and place) on parts that have a well understood but unknown shape. In these cases,
-        general purpose latent representations are too general to elegantly capture the prior geometric information,
-        but classical template matching may require too much manual fine-tuning or insufficient accuracy for the
-        application[1].
-    </p>
-    <p>
-        I propose to use OpenSCAD scripts as 3D representations for parametric models to explicitly define a
-        parameterization of the 3D scene. OpenSCAD is a well-known text-based 3D modelling program that is widely
-        used to create “customizable” models where a few key variables are explicitly defined. By replacing the
-        OpenSCAD renderer with a differential renderer, I can recover these model parameters from an image by
-        performing gradient descent on the model parameters and pose through the differentiable renderer similar to
-        the reconstruction training approach described in [2], [3]. A nice example of this approach to recover the pose
-        of a completely defined mesh is given in [4].
-    </p>
-    <p>
-        There is a significant body of work that uses deformable 3D models (or large databases of 3D models) to fit
-        meshes and extract the pose of target objects from a single photo[5], [6], [7], [8], [9], [10], [11]. The proposed
-        approach has orders of magnitude fewer optimization parameters because I am optimizing a small number of
-        user-specified parameters rather than the position of every point on the mesh. The handful of papers that do
-        use explicitly defined low-dimensional 3D parameterizations are application specific and therefore use
-        training/inference techniques that do not attempt to completely describe the 3D object [12],[13]. On the
-        other end of the spectrum, the proposed project has a lot in common with classical approaches to object
-        matching using user-specified models, with the important difference that these template-matching
-        algorithms do not leverage a differentiable renderer for gradient-descent on the image data [14], [15].
-    </p>
-    <p>
-        I will aim to compare reconstruction using explicitly parameterized models for surface mounted integrated
-        circuits, fasteners, and spur gears to conventional 3D reconstruction techniques using more general latent
-        representations to answer the following questions:
-        <ol>
-            <li>For a given accuracy, how does the size and speed of explicitly parameterized reconstruction
-                compare to traditional methods?</li>
-            <li>Does explicitly parameterized reconstruction generalize to real-world input images better than
-                    conventional mesh fitting? Specifically, how does the accuracy on a test set of real images compare?</li>
-            <li>Are results consistent across object type? What types of parameterizations are allowable? (it seems
-                        likely that affine transformations will work better than parameterizations that change, for example,
-                        the number or arrangement of certain features).</li>
-        </ol>
-    </p>
-    <p>
-        Finally, to assess whether this approach is simpler to set up than template matching with a parameterized
-        template, I will also implement a classical template matching pipeline for these objects and discuss the
-        amount of fine-tuning required to use the two approaches for different classes of objects.
-    </p>
-    <h2>Conventional Object Tracking with OpenCV</h2>
-    <h2>Mesh Fitting with Differential Rendering</h2>
-    <h2>The Problem with External Modelling Programs</h2>
-    <h2>Blender Transforms</h2>
-    <h2>Implementing A Pytorch Pipeline</h2>
-    <h2>Parameterized Mesh Fitting</h2>
-    <h2>More Complex Meshes</h2>
-    <h2>Comparison to Existing Techniques</h2>
-    <h2>Conclusion</h2>
-    <p></p>
-    <p>Here’s a paragraph with a <code>code snippet</code> and a blockquote:</p>
+      footer {
+        margin-top: 4rem;
+        text-align: center;
+        font-size: 0.9em;
+        color: #777;
+      }
+    </style>
+  </head>
+  <body>
+    <article>
+      <h1>Single Image Reconstruction with Explicitly Parameterized Latent Spaces</h1>
 
-    <blockquote>
-      "This is a sample quote that adds emphasis to your content."
-    </blockquote>
-
-    <h3>Code Example</h3>
-    <pre><code>const hello = "world";
-console.log(hello);</code></pre>
-    <h2>References</h2>
-    <ol>
-        <li>D. Shin, C. C. Fowlkes, and D. Hoiem, “Pixels, Voxels, and Views: A Study of Shape Representations for Single View 3D Object Shape Prediction,” in <i>2018 IEEE/CVF Conference on Computer Vision and Pattern Recognition</i>, Salt Lake City, UT: IEEE, Jun. 2018, pp. 3061–3069. doi: <a href="https://doi.org/10.1109/CVPR.2018.00323">10.1109/CVPR.2018.00323</a>.</li>
-        <li>S. Popov, P. Bauszat, and V. Ferrari, “CoReNet: Coherent 3D scene reconstruction from a single RGB image,” Aug. 05, 2020, <i>arXiv</i>: arXiv:2004.12989. doi: <a href="https://doi.org/10.48550/arXiv.2004.12989">10.48550/arXiv.2004.12989</a>.</li>
-        <li>P. Henderson and V. Ferrari, “Learning single-image 3D reconstruction by generative modelling of shape, pose and shading,” Aug. 26, 2019, <i>arXiv</i>: arXiv:1901.06447. doi: <a href="https://doi.org/10.48550/arXiv.1901.06447">10.48550/arXiv.1901.06447</a>.</li>
-        <li>A. Chan, “Adventures with Differentiable Mesh Rendering,” <i>Distill</i>. Accessed: Apr. 08, 2025. [Online]. Available: <a href="http://andrewkchan.dev/">http://andrewkchan.dev/</a></li>
-        <li>N. Kholgade, T. Simon, A. Efros, and Y. Sheikh, “3D object manipulation in a single photograph using stock 3D models,” <i>ACM Trans. Graph.</i>, vol. 33, no. 4, pp. 1–12, Jul. 2014. doi: <a href="https://doi.org/10.1145/2601097.2601209">10.1145/2601097.2601209</a>.</li>
-        <li>J. J. Lim, A. Khosla, and A. Torralba, “FPM: Fine Pose Parts-Based Model with 3D CAD Models,” in <i>Computer Vision – ECCV 2014</i>, vol. 8694, D. Fleet, T. Pajdla, B. Schiele, and T. Tuytelaars, Eds., Lecture Notes in Computer Science, Cham: Springer, 2014, pp. 478–493. doi: <a href="https://doi.org/10.1007/978-3-319-10599-4_31">10.1007/978-3-319-10599-4_31</a>.</li>
-        <li>K. Rematas, T. Ritschel, M. Fritz, and T. Tuytelaars, “Image-Based Synthesis and Re-synthesis of Viewpoints Guided by 3D Models,” in <i>2014 IEEE Conference on Computer Vision and Pattern Recognition</i>, Columbus, OH, USA: IEEE, Jun. 2014, pp. 3898–3905. doi: <a href="https://doi.org/10.1109/CVPR.2014.498">10.1109/CVPR.2014.498</a>.</li>
-        <li>M. Aubry, D. Maturana, A. A. Efros, B. C. Russell, and J. Sivic, “Seeing 3D Chairs: Exemplar Part-Based 2D-3D Alignment Using a Large Dataset of CAD Models,” in <i>2014 IEEE Conference on Computer Vision and Pattern Recognition</i>, Jun. 2014, pp. 3762–3769. doi: <a href="https://doi.org/10.1109/CVPR.2014.487">10.1109/CVPR.2014.487</a>.</li>
-        <li>C. B. Choy, M. Stark, S. Corbett-Davies, and S. Savarese, “Enriching object detection with 2D-3D registration and continuous viewpoint estimation,” in <i>2015 IEEE Conference on Computer Vision and Pattern Recognition (CVPR)</i>, Boston, MA, USA: IEEE, Jun. 2015, pp. 2512–2520. doi: <a href="https://doi.org/10.1109/CVPR.2015.7298866">10.1109/CVPR.2015.7298866</a>.</li>
-        <li>J. Rock, T. Gupta, J. Thorsen, J. Gwak, D. Shin, and D. Hoiem, “Completing 3D object shape from one depth image,” in <i>2015 IEEE Conference on Computer Vision and Pattern Recognition (CVPR)</i>, Boston, MA, USA: IEEE, Jun. 2015, pp. 2484–2493. doi: <a href="https://doi.org/10.1109/CVPR.2015.7298863">10.1109/CVPR.2015.7298863</a>.</li>
-        <li>M. Yavartanoo, J. Chung, R. Neshatavar, and K. M. Lee, “3DIAS: 3D Shape Reconstruction with Implicit Algebraic Surfaces,” Aug. 19, 2021, <i>arXiv</i>: arXiv:2108.08653. doi: <a href="https://doi.org/10.48550/arXiv.2108.08653">10.48550/arXiv.2108.08653</a>.</li>
-        <li>K. Genova, F. Cole, A. Maschinot, A. Sarna, D. Vlasic, and W. T. Freeman, “Unsupervised Training for 3D Morphable Model Regression,” in <i>2018 IEEE/CVF Conference on Computer Vision and Pattern Recognition</i>, Salt Lake City, UT, USA: IEEE, Jun. 2018, pp. 8377–8386. doi: <a href="https://doi.org/10.1109/CVPR.2018.00874">10.1109/CVPR.2018.00874</a>.</li>
-        <li>M. Z. Zia, M. Stark, B. Schiele, and K. Schindler, “Detailed 3D Representations for Object Recognition and Modeling,” <i>IEEE Trans. Pattern Anal. Mach. Intell.</i>, vol. 35, no. 11, pp. 2608–2623, Nov. 2013. doi: <a href="https://doi.org/10.1109/TPAMI.2013.87">10.1109/TPAMI.2013.87</a>.</li>
-        <li>D. Roller, K. Daniilidis, and H. H. Nagel, “Model-based object tracking in monocular image sequences of road traffic scenes,” <i>Int. J. Comput. Vis.</i>, vol. 10, no. 3, pp. 257–281, Jun. 1993. doi: <a href="https://doi.org/10.1007/BF01539538">10.1007/BF01539538</a>.</li>
-        <li>L. G. Roberts, “Machine perception of three-dimensional solids,” Thesis, Massachusetts Institute of Technology, 1963. Accessed: Apr. 08, 2025. [Online]. Available: <a href="https://dspace.mit.edu/handle/1721.1/11589">https://dspace.mit.edu/handle/1721.1/11589</a></li>
+      <p><em>By Hans Gaensbauer • April 21, 2025</em></p>
+      <h2>Introduction</h2>
+      <p>
+        Single image reconstruction is generally under-constrained, since the 2D
+        projection implicit in the creation of the image destroys information about depth.
+        However, for some applications, prior information about the 3D geometry
+        drastically reduces the number of parameters required to completely describe the
+        scene. For example, in industrial settings when computer vision is to be used to
+        perform measurements (for verification) or localization (for pick and place) on
+        parts that have a well understood but unknown shape. In these cases, general
+        purpose latent representations are too general to elegantly capture the prior
+        geometric information,but classical template matching may require too much manual
+        fine-tuning or insufficient accuracy for the application[1].
+      </p>
+      <p>
+        I propose to use OpenSCAD scripts as 3D representations for parametric models to
+        explicitly define a parameterization of the 3D scene. OpenSCAD is a well-known
+        text-based 3D modelling program that is widely used to create “customizable”
+        models where a few key variables are explicitly defined. By replacing the OpenSCAD
+        renderer with a differential renderer, I can recover these model parameters from
+        an image by performing gradient descent on the model parameters and pose through
+        the differentiable renderer similar to the reconstruction training approach
+        described in [2], [3]. A nice example of this approach to recover the pose of a
+        completely defined mesh is given in [4].
+      </p>
+      <p>
+        There is a significant body of work that uses deformable 3D models (or large
+        databases of 3D models) to fit meshes and extract the pose of target objects from
+        a single photo[5], [6], [7], [8], [9], [10], [11]. The proposed approach has
+        orders of magnitude fewer optimization parameters because I am optimizing a small
+        number of user-specified parameters rather than the position of every point on the
+        mesh. The handful of papers that do use explicitly defined low-dimensional 3D
+        parameterizations are application specific and therefore use training/inference
+        techniques that do not attempt to completely describe the 3D object [12],[13]. On
+        the other end of the spectrum, the proposed project has a lot in common with
+        classical approaches to object matching using user-specified models, with the
+        important difference that these template-matching algorithms do not leverage a
+        differentiable renderer for gradient-descent on the image data [14], [15].
+      </p>
+      <p>
+        I will aim to compare reconstruction using explicitly parameterized models for
+        surface mounted integrated circuits, fasteners, and spur gears to conventional 3D
+        reconstruction techniques using more general latent representations to answer the
+        following questions:
+      </p>
+      <ol>
+        <li>
+          For a given accuracy, how does the size and speed of explicitly parameterized
+          reconstruction compare to traditional methods?
+        </li>
+        <li>
+          Does explicitly parameterized reconstruction generalize to real-world input
+          images better than conventional mesh fitting? Specifically, how does the
+          accuracy on a test set of real images compare?
+        </li>
+        <li>
+          Are results consistent across object type? What types of parameterizations are
+          allowable? (it seems likely that affine transformations will work better than
+          parameterizations that change, for example, the number or arrangement of certain
+          features).
+        </li>
       </ol>
-  </article>
+      <p>
+        Finally, to assess whether this approach is simpler to set up than template
+        matching with a parameterized template, I will also implement a classical template
+        matching pipeline for these objects and discuss the amount of fine-tuning required
+        to use the two approaches for different classes of objects.
+      </p>
+      <h2>Conventional Object Tracking with OpenCV</h2>
+      <h2>Mesh Fitting with Differential Rendering</h2>
+      <p>
+        A different approach that can leverage the tools we have for machine learning is
+        to use gradient descent to optimize a mesh by rendering views of that mesh that
+        correspond to our ground-truth images with a differentiable renderer. We can use
+        the L2 loss between the rendered image of our mesh and the ground truth image, and
+        back-propagate through the renderer in order to update the positions of the
+        vertices. This approach has been described extensively and is relatively
+        straightforward to implement using tools like Pytorch3D. Typically, the mesh is
+        stored as a Pytorch tensor, and the 3D position of every vertex of the mesh is
+        optimized.
+      </p>
+      <img src="" alt="Add the image from andrekchan.dev!" />
+      <br />
+      <p>
+        While there is nothing preventing us from parameterizing only a subset of the mesh
+        vertices, or from adding constraints to the changes that we allow the optimizer to
+        make, in practice this quickly becomes inconvenient because Pytorch is not a 3D
+        modelling program. A better workflow is to use a dedicated mesh modelling program
+        like Blender to create a parameterized model which is then brought into Pytorch
+        and optimized. Blender is a particularly attractive choice because it is very
+        tightly integrated with Python anyway, and the Blender Python API makes it easy to
+        access the model and the user-defined parameters. Blender supports a variety of
+        parametric transformations that give us an intuitive way of defining degres of
+        freedom for our model.
+      </p>
+      <img src="" alt="Another photo? Parametric model GIF?" />
+      <p>
+        Unfortunately, because Blender is not implemented in PyTorch, none of the mesh
+        updates can be differentiated by Pytorch. This is a deeper problem inherent in any
+        attempt to couple an external program with deep learning tools, since file IO in
+        general breaks the gradient computation. Fortunately, besaf cause Blender is so
+        well integrated with Python, it is possible to extract each of the transform
+        matrices associated with the applied mesh transformations. This makes it possible
+        to keep the mesh in pytorch while applying transformations that are defined in
+        Blender, and the final mesh in Blender can be updated after the optimization
+        process.
+      </p>
+      <h2>Blender Transforms</h2>
+      <p>
+        Blender is a free and open source program for 3D modelling, sculpting, VFX,
+        simulation, video editing, animation, and a whole host of other features. It is
+        extremely well supported, meaning it is very straightforward to learn how to use
+        it to create custom parameterized models using online tutorials.
+        <br /><br />
+        In Blender, meshes are edited in "Edit Mode", which gives fine control over
+        individual mesh vertices. Afterward, the finished mesh can be further transformed
+        and positioned in "Object Mode", which is where the render and scene are set up.
+        Blender is an extremely feature-rich modelling program and thus there are very
+        many modifiers and transformations that can be applied to a model. For this
+        project, I will restrict myself to affine transformations applied in Object Mode
+        and Shape Keys applied in Edit Mode, which together are sufficient to capture a
+        decent range of possible mesh degrees of freedom.
+      </p>
+      <h3>Object Transformations and Drivers</h3>
+      <p>
+        After the vertex positions are computed in Blender, it is possible to apply a
+        number of additional transformations to the entire mesh in Object Mode. The entire
+        mesh is transformed using a 4x4 matrix in homogeneous coordinates to locate the object within the scene. 
+        <br><br>
+        In order to parameterize these transformations, Blender includes "drivers" which can be used to drive transformations. For general use, drivers allow certain object properties to be driven by other parameters in the model, but for our use, drivers allow us to flag parts of the transformation matrix that we want to optimize. For example, we can specify that we only want to vary the X/Y position (and not Z) of the object on some known surface, or constrain the aspect ratio while allowing the absolute size to be optimized.
+        <br><br>
+        While there are a miscellany of ways to communicate a specific parameterization to the optimizer in Pytorch, the approach that best aligns with convention for drivers in normal Blender use is to define an empty "control object" that has custom parameters for each of the variables we wish to optimize. Then, each of the drivers that we define for the objects we want to optimize refer to the properties of the control object. This is especially convenient because we need to compute the world transformation matrix in Pytorch in order to use it in the optimization. The series of steps to evaluate the transformation matrix in Pytorch looks like this:
+      </p>
+      <ol>
+        <li>Extract all of the custom properties from the empty control object</li>
+        <li>Extract the list of drivers from the objects in the scene</li>
+        <li>Evaluate each driver using the custom properties as dependencies</li>
+        <li>Compute the transform matrix using the drivers</li>
+      </ol>
+      <p>
+        In practice, this is further complicated by the fact that all of the expressions for the different dependencies are strings, which need to be parsed at runtime. Furthermore, it is not enough to evaluate each expression once and call it good: we need to build an executable pipeline in Pytorch that can compute new transform matrices without re-accessing the blender file. To do this, we build an update_matrix() function from the drivers/parameters at runtime:
+      </p>
+      <pre><code> # 1. Extract all of the custom properties from the empty control object
+  control = bpy.data.objects["Control"]
+  custom_props = {}
 
-  <footer>
-    &copy; 2025 Your Name or Blog Title
-  </footer>
-</body>
+  if control is not None:
+      for key, value in control.items():
+          if not key.startswith("_"):
+              custom_props[key] = value
+
+  #Assign each of the custom properties to custom variables
+  def initialize_params(custom_props):
+      params_assign_string = ""
+      for prop in custom_props:
+          params_assign_string += f"global {prop}\n"
+          params_assign_string += f"{prop} = torch.tensor([{custom_props[prop]}], device=device, requires_grad=True)\n"
+      exec(params_assign_string)
+
+  initialize_params(custom_props)
+
+  # 2. Extract the list of drivers from the objects in the scene
+  obj = bpy.data.objects["Target"]
+  drivers = {}
+  #defaults
+  drivers["location"] =       [{"exp":"0","vars":{}},
+                                {"exp":"0","vars":{}},
+                                {"exp":"0","vars":{}}]
+
+  drivers["rotation_euler"] = [{"exp":"0","vars":{}},
+                                {"exp":"0","vars":{}},
+                                {"exp":"0","vars":{}}]
+
+  drivers["scale"] =          [{"exp":"1","vars":{}},
+                                {"exp":"1","vars":{}},
+                                {"exp":"1","vars":{}}]
+
+  if obj.animation_data and obj.animation_data.drivers:
+      for driver in obj.animation_data.drivers:
+          drivers[driver.data_path][driver.array_index]["exp"] = driver.driver.expression
+          variables = {}
+          for var in driver.driver.variables:
+              variables[var.name] = var.targets[0].data_path
+          drivers[driver.data_path][driver.array_index]["vars"] = variables
+  else:
+      print("No drivers on this object.")
+
+  # 3. Evaluate each driver using the custom properties as dependencies
+
+  def get_transform_update_string(drivers):
+      vstr = "def update_transform():\n"
+      for driver in drivers:
+          vstr += f"\t{driver} = []\n"
+          for axis in range(3):
+              vars = drivers[driver][axis]["vars"]
+              for var in vars:
+                  vstr += f"\t{var} = {vars[var][2:-2]}\n"
+              exp = drivers[driver][axis]["exp"]
+              vstr += f"\t{driver}.append({exp})\n"
+          vstr += f"\t{driver} = torch.tensor({driver})\n"
+      vstr += "\treturn build_transform(location, rotation_euler, scale)\n"
+      return vstr
+
+  print(get_transform_update_string(drivers))
+
+  # 4. Compute the transform matrix using the drivers
+  def build_transform(location, rotation, scale):
+      lx, ly, lz = location
+      sx, sy, sz = scale
+      cx, cy, cz = torch.cos(rotation)
+      sxr, syr, szr = torch.sin(rotation)
+
+      Rx = torch.tensor([
+          [1, 0, 0],
+          [0, cx, -sxr],
+          [0, sxr, cx]
+      ])
+
+      Ry = torch.tensor([
+          [cy, 0, syr],
+          [0, 1, 0],
+          [-syr, 0, cy]
+      ])
+
+      Rz = torch.tensor([
+          [cz, -szr, 0],
+          [szr, cz, 0],
+          [0, 0, 1]
+      ])
+      R = Rz @ Ry @ Rx
+      S = torch.diag(torch.tensor([sx, sy, sz]))
+      RS = R @ S
+
+      M = torch.eye(4)
+      M[:3, :3] = RS
+      M[:3, 3] = torch.tensor([lx, ly, lz])
+
+      return M
+
+  exec(get_transform_update_string(drivers))
+  print(update_transform())
+      </code></pre>
+      <p>
+        As an example, for a cube with rotation and the x axis scale that are both driven by a single parameter, this code produces the following output: 
+      </p>
+    <pre><code> GPU Detected
+  Read blend: "C:\Users\hangaen\Desktop\BlenderModelFitting\transform_driver_demo.blend"    
+  {'location': [{'exp': '0', 'vars': {}}, {'exp': '0', 'vars': {}}, {'exp': '0', 'vars': {}}], 'rotation_euler': [{'exp': '0.3*var', 'vars': {'var': '["scale1"]'}}, {'exp': '0', 'vars': {}}, {'exp': '0', 'vars': {}}], 'scale': [{'exp': '2*var', 'vars': {'var': '["scale1"]'}}, {'exp': '1', 'vars': {}}, {'exp': '1', 'vars': {}}]}
+  def update_transform():
+          location = []
+          location.append(0)
+          location.append(0)
+          location.append(0)
+          location = torch.tensor(location)
+          rotation_euler = []
+          var = scale1
+          rotation_euler.append(0.3*var)
+          rotation_euler.append(0)
+          rotation_euler.append(0)
+          rotation_euler = torch.tensor(rotation_euler)
+          scale = []
+          var = scale1
+          scale.append(2*var)
+          scale.append(1)
+          scale.append(1)
+          scale = torch.tensor(scale)
+          return build_transform(location, rotation_euler, scale)
+  
+  tensor([[ 2.0000,  0.0000,  0.0000,  0.0000],
+          [ 0.0000,  0.9553, -0.2955,  0.0000],
+          [ 0.0000,  0.2955,  0.9553,  0.0000],
+          [ 0.0000,  0.0000,  0.0000,  1.0000]])
+</code></pre>
+      <h3>Shape Keys</h3>
+      <p>
+        Shape Keys are a Blender feature for creating arbitrary parametric mesh
+        distortions. The user defines a default mesh configuration and then uses Edit Mode
+        to distort the mesh to a desired "end" position. The shape key defines a linear
+        interpolation between the start and end vertex positions for the selected
+        vertices, weighted by the "key" parameter. For example, this can be used to make a
+        character smile or to scale and move certain parts of the mesh. It is possible to
+        define multiple shape keys for the same vertices, in which case the final mesh is
+        the weighted sum of each of the transformations.
+        <br /><br />
+        To apply a shape key outside of Blender, we extract the "basis" or starting vertex
+        positions and the "key" or ending vertex positions, and then compute the new mesh
+        as <code>mesh = basis + key*(key-basis)</code>:
+      </p>
+      <pre><code> # Apply a shape key externally
+  basis = cube.shape_keys.key_blocks["Basis"].data
+  basis_verts = torch.tensor(np.array([v.co[:] for v in basis], 
+      dtype=np.float32)[np.newaxis,:,:], requires_grad=True, device=device)
+  key1 = cube.shape_keys.key_blocks["Wider Top"].data
+  key1_verts = torch.tensor(np.array([v.co[:] for v in key1], 
+      dtype=np.float32)[np.newaxis,:,:], requires_grad=True, device=device)
+  
+  #Compute the distorted mesh
+  keyval = torch.tensor([0.8], requires_grad=True, device=device)
+  verts = basis_verts + keyval * (key1_verts - basis_verts)
+  mesh = Meshes(verts=verts, faces=faces_tensor, textures=textures)
+</code></pre>
+
+      <h2>Parameterized Mesh Fitting</h2>
+
+      <h2>More Complex Meshes</h2>
+      <h3>Optimizing Position</h3>
+      <h3>Hidden Vertices and Composite Models</h3>
+      <h2>Fitting Photos</h2>
+      <h2>Comparison to Existing Techniques</h2>
+      <h2>Conclusion</h2>
+      <p></p>
+      <p>Here’s a paragraph with a <code>code snippet</code> and a blockquote:</p>
+
+      <blockquote>
+        "This is a sample quote that adds emphasis to your content."
+      </blockquote>
+
+      <h3>Code Example</h3>
+
+      <h2>References</h2>
+      <ol>
+        <li>
+          D. Shin, C. C. Fowlkes, and D. Hoiem, “Pixels, Voxels, and Views: A Study of
+          Shape Representations for Single View 3D Object Shape Prediction,” in
+          <i>2018 IEEE/CVF Conference on Computer Vision and Pattern Recognition</i>, Salt
+          Lake City, UT: IEEE, Jun. 2018, pp. 3061–3069. doi:
+          <a href="https://doi.org/10.1109/CVPR.2018.00323">10.1109/CVPR.2018.00323</a>.
+        </li>
+        <li>
+          S. Popov, P. Bauszat, and V. Ferrari, “CoReNet: Coherent 3D scene reconstruction
+          from a single RGB image,” Aug. 05, 2020, <i>arXiv</i>: arXiv:2004.12989. doi:
+          <a href="https://doi.org/10.48550/arXiv.2004.12989">10.48550/arXiv.2004.12989</a
+          >.
+        </li>
+        <li>
+          P. Henderson and V. Ferrari, “Learning single-image 3D reconstruction by
+          generative modelling of shape, pose and shading,” Aug. 26, 2019,
+          <i>arXiv</i>: arXiv:1901.06447. doi:
+          <a href="https://doi.org/10.48550/arXiv.1901.06447">10.48550/arXiv.1901.06447</a
+          >.
+        </li>
+        <li>
+          A. Chan, “Adventures with Differentiable Mesh Rendering,”
+          <i>Distill</i>. Accessed: Apr. 08, 2025. [Online]. Available:
+          <a href="http://andrewkchan.dev/">http://andrewkchan.dev/</a>
+        </li>
+        <li>
+          N. Kholgade, T. Simon, A. Efros, and Y. Sheikh, “3D object manipulation in a
+          single photograph using stock 3D models,”
+          <i>ACM Trans. Graph.</i>, vol. 33, no. 4, pp. 1–12, Jul. 2014. doi:
+          <a href="https://doi.org/10.1145/2601097.2601209">10.1145/2601097.2601209</a>.
+        </li>
+        <li>
+          J. J. Lim, A. Khosla, and A. Torralba, “FPM: Fine Pose Parts-Based Model with 3D
+          CAD Models,” in
+          <i>Computer Vision – ECCV 2014</i>, vol. 8694, D. Fleet, T. Pajdla, B. Schiele,
+          and T. Tuytelaars, Eds., Lecture Notes in Computer Science, Cham: Springer,
+          2014, pp. 478–493. doi:
+          <a href="https://doi.org/10.1007/978-3-319-10599-4_31"
+            >10.1007/978-3-319-10599-4_31</a
+          >.
+        </li>
+        <li>
+          K. Rematas, T. Ritschel, M. Fritz, and T. Tuytelaars, “Image-Based Synthesis and
+          Re-synthesis of Viewpoints Guided by 3D Models,” in
+          <i>2014 IEEE Conference on Computer Vision and Pattern Recognition</i>,
+          Columbus, OH, USA: IEEE, Jun. 2014, pp. 3898–3905. doi:
+          <a href="https://doi.org/10.1109/CVPR.2014.498">10.1109/CVPR.2014.498</a>.
+        </li>
+        <li>
+          M. Aubry, D. Maturana, A. A. Efros, B. C. Russell, and J. Sivic, “Seeing 3D
+          Chairs: Exemplar Part-Based 2D-3D Alignment Using a Large Dataset of CAD
+          Models,” in
+          <i>2014 IEEE Conference on Computer Vision and Pattern Recognition</i>, Jun.
+          2014, pp. 3762–3769. doi:
+          <a href="https://doi.org/10.1109/CVPR.2014.487">10.1109/CVPR.2014.487</a>.
+        </li>
+        <li>
+          C. B. Choy, M. Stark, S. Corbett-Davies, and S. Savarese, “Enriching object
+          detection with 2D-3D registration and continuous viewpoint estimation,” in
+          <i>2015 IEEE Conference on Computer Vision and Pattern Recognition (CVPR)</i>,
+          Boston, MA, USA: IEEE, Jun. 2015, pp. 2512–2520. doi:
+          <a href="https://doi.org/10.1109/CVPR.2015.7298866">10.1109/CVPR.2015.7298866</a
+          >.
+        </li>
+        <li>
+          J. Rock, T. Gupta, J. Thorsen, J. Gwak, D. Shin, and D. Hoiem, “Completing 3D
+          object shape from one depth image,” in
+          <i>2015 IEEE Conference on Computer Vision and Pattern Recognition (CVPR)</i>,
+          Boston, MA, USA: IEEE, Jun. 2015, pp. 2484–2493. doi:
+          <a href="https://doi.org/10.1109/CVPR.2015.7298863">10.1109/CVPR.2015.7298863</a
+          >.
+        </li>
+        <li>
+          M. Yavartanoo, J. Chung, R. Neshatavar, and K. M. Lee, “3DIAS: 3D Shape
+          Reconstruction with Implicit Algebraic Surfaces,” Aug. 19, 2021,
+          <i>arXiv</i>: arXiv:2108.08653. doi:
+          <a href="https://doi.org/10.48550/arXiv.2108.08653">10.48550/arXiv.2108.08653</a
+          >.
+        </li>
+        <li>
+          K. Genova, F. Cole, A. Maschinot, A. Sarna, D. Vlasic, and W. T. Freeman,
+          “Unsupervised Training for 3D Morphable Model Regression,” in
+          <i>2018 IEEE/CVF Conference on Computer Vision and Pattern Recognition</i>, Salt
+          Lake City, UT, USA: IEEE, Jun. 2018, pp. 8377–8386. doi:
+          <a href="https://doi.org/10.1109/CVPR.2018.00874">10.1109/CVPR.2018.00874</a>.
+        </li>
+        <li>
+          M. Z. Zia, M. Stark, B. Schiele, and K. Schindler, “Detailed 3D Representations
+          for Object Recognition and Modeling,”
+          <i>IEEE Trans. Pattern Anal. Mach. Intell.</i>, vol. 35, no. 11, pp. 2608–2623,
+          Nov. 2013. doi:
+          <a href="https://doi.org/10.1109/TPAMI.2013.87">10.1109/TPAMI.2013.87</a>.
+        </li>
+        <li>
+          D. Roller, K. Daniilidis, and H. H. Nagel, “Model-based object tracking in
+          monocular image sequences of road traffic scenes,”
+          <i>Int. J. Comput. Vis.</i>, vol. 10, no. 3, pp. 257–281, Jun. 1993. doi:
+          <a href="https://doi.org/10.1007/BF01539538">10.1007/BF01539538</a>.
+        </li>
+        <li>
+          L. G. Roberts, “Machine perception of three-dimensional solids,” Thesis,
+          Massachusetts Institute of Technology, 1963. Accessed: Apr. 08, 2025. [Online].
+          Available:
+          <a href="https://dspace.mit.edu/handle/1721.1/11589"
+            >https://dspace.mit.edu/handle/1721.1/11589</a
+          >
+        </li>
+      </ol>
+    </article>
+
+    <footer>&copy; 2025 Your Name or Blog Title</footer>
+  </body>
 </html>
