@@ -4,6 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Parameterized Reconstruction</title>
+    <link href="prism.css" rel="stylesheet" />
     <style>
       body {
         font-family: system-ui, sans-serif;
@@ -66,7 +67,8 @@
     </style>
   </head>
   <body>
-    <article>
+    <script src="prism.js"></script>
+    <article class="language-py">
       <h1>Single Image Reconstruction with Explicitly Parameterized Latent Spaces</h1>
 
       <p><em>By Hans Gaensbauer • April 21, 2025</em></p>
@@ -196,11 +198,26 @@
       <p>
         After the vertex positions are computed in Blender, it is possible to apply a
         number of additional transformations to the entire mesh in Object Mode. The entire
-        mesh is transformed using a 4x4 matrix in homogeneous coordinates to locate the object within the scene. 
-        <br><br>
-        In order to parameterize these transformations, Blender includes "drivers" which can be used to drive transformations. For general use, drivers allow certain object properties to be driven by other parameters in the model, but for our use, drivers allow us to flag parts of the transformation matrix that we want to optimize. For example, we can specify that we only want to vary the X/Y position (and not Z) of the object on some known surface, or constrain the aspect ratio while allowing the absolute size to be optimized.
-        <br><br>
-        While there are a miscellany of ways to communicate a specific parameterization to the optimizer in Pytorch, the approach that best aligns with convention for drivers in normal Blender use is to define an empty "control object" that has custom parameters for each of the variables we wish to optimize. Then, each of the drivers that we define for the objects we want to optimize refer to the properties of the control object. This is especially convenient because we need to compute the world transformation matrix in Pytorch in order to use it in the optimization. The series of steps to evaluate the transformation matrix in Pytorch looks like this:
+        mesh is transformed using a 4x4 matrix in homogeneous coordinates to locate the
+        object within the scene.
+        <br /><br />
+        In order to parameterize these transformations, Blender includes "drivers" which
+        can be used to drive transformations. For general use, drivers allow certain
+        object properties to be driven by other parameters in the model, but for our use,
+        drivers allow us to flag parts of the transformation matrix that we want to
+        optimize. For example, we can specify that we only want to vary the X/Y position
+        (and not Z) of the object on some known surface, or constrain the aspect ratio
+        while allowing the absolute size to be optimized.
+        <br /><br />
+        While there are a miscellany of ways to communicate a specific parameterization to
+        the optimizer in Pytorch, the approach that best aligns with convention for
+        drivers in normal Blender use is to define an empty "control object" that has
+        custom parameters for each of the variables we wish to optimize. Then, each of the
+        drivers that we define for the objects we want to optimize refer to the properties
+        of the control object. This is especially convenient because we need to compute
+        the world transformation matrix in Pytorch in order to use it in the optimization.
+        The series of steps to evaluate the transformation matrix in Pytorch looks like
+        this:
       </p>
       <ol>
         <li>Extract all of the custom properties from the empty control object</li>
@@ -209,7 +226,12 @@
         <li>Compute the transform matrix using the drivers</li>
       </ol>
       <p>
-        In practice, this is further complicated by the fact that all of the expressions for the different dependencies are strings, which need to be parsed at runtime. Furthermore, it is not enough to evaluate each expression once and call it good: we need to build an executable pipeline in Pytorch that can compute new transform matrices without re-accessing the blender file. To do this, we build an update_matrix() function from the drivers/parameters at runtime:
+        In practice, this is further complicated by the fact that all of the expressions
+        for the different dependencies are strings, which need to be parsed at runtime.
+        Furthermore, it is not enough to evaluate each expression once and call it good:
+        we need to build an executable pipeline in Pytorch that can compute new transform
+        matrices without re-accessing the blender file. To do this, we build an
+        update_matrix() function from the drivers/parameters at runtime:
       </p>
       <pre><code> # 1. Extract all of the custom properties from the empty control object
   control = bpy.data.objects["Control"]
@@ -312,9 +334,10 @@
   print(update_transform())
       </code></pre>
       <p>
-        As an example, for a cube with rotation and the x axis scale that are both driven by a single parameter, this code produces the following output: 
+        As an example, for a cube with rotation and the x axis scale that are both driven
+        by a single parameter, this code produces the following output:
       </p>
-    <pre><code> GPU Detected
+      <pre><code> GPU Detected
   Read blend: "C:\Users\hangaen\Desktop\BlenderModelFitting\transform_driver_demo.blend"    
   {'location': [{'exp': '0', 'vars': {}}, {'exp': '0', 'vars': {}}, {'exp': '0', 'vars': {}}], 'rotation_euler': [{'exp': '0.3*var', 'vars': {'var': '["scale1"]'}}, {'exp': '0', 'vars': {}}, {'exp': '0', 'vars': {}}], 'scale': [{'exp': '2*var', 'vars': {'var': '["scale1"]'}}, {'exp': '1', 'vars': {}}, {'exp': '1', 'vars': {}}]}
   def update_transform():
