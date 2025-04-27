@@ -1,7 +1,7 @@
 import bpy
 import matplotlib.pyplot as plt
 import numpy as np
-from PIL import Image
+import imageio
 
 import torch
 from pytorch3d.structures import Meshes
@@ -23,15 +23,16 @@ else:
 bpy.ops.wm.open_mainfile(filepath="shapekey_demo.blend")
 
 # Camera and lights (customize if needed)
-R, T = look_at_view_transform(dist=5, elev=90, azim=0)
+R, T = look_at_view_transform(dist=3, elev=60, azim=20)
 cameras = PerspectiveCameras(R=R, T=T, device=device)
-lights = PointLights(device=device, location=[[0.0, 0.0, -3.0]])
+lights = PointLights(device=device, location=[[3.0, 0.0, 3.0]])
 
 # Basic renderer
+image_size = 512
 renderer = MeshRenderer(
     rasterizer=MeshRasterizer(
         cameras=cameras,
-        raster_settings=RasterizationSettings(image_size=512)
+        raster_settings=RasterizationSettings(image_size=image_size)
     ),
     shader=SoftPhongShader(device=device, cameras=cameras, lights=lights)
 )
@@ -64,17 +65,29 @@ keyval = torch.tensor([0.8], requires_grad=True, device=device)
 # Render
 image = renderer(mesh)
 
-optimizer = torch.optim.Adam([keyval], lr=0.1)
+optimizer = torch.optim.Adam([keyval], lr=0.05)
 verts = torch.zeros_like(basis_verts, requires_grad=True)
-with tqdm(range(100)) as titer:
+
+num_epochs = 100
+epochs_per_save = 5
+gif_images = np.zeros((num_epochs//epochs_per_save, image_size, image_size, 3), dtype=np.uint8)
+with tqdm(range(num_epochs)) as titer:
     for i in titer:
         optimizer.zero_grad()
         #Update the mesh
         verts = basis_verts + keyval * (key1_verts - basis_verts)
         mesh = Meshes(verts=verts, faces=faces_tensor, textures=textures)
+
         #Render
         cimage = renderer(mesh)
+        #Save the image into a GIF to show the training proces
+        if(not i % epochs_per_save):
+            gif_images[i//epochs_per_save] = (cimage[...,:3]*255).byte().detach().cpu().numpy()
+
         loss = torch.sum((cimage - target_image)**2)
         loss.backward()
         optimizer.step()
         titer.set_postfix(loss=loss.item(), keyval=keyval.item())
+
+# Save GIF
+imageio.mimsave('shapekey_training_process.gif', gif_images, fps=len(gif_images))

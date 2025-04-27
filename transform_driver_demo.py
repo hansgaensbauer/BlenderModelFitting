@@ -2,6 +2,8 @@ import bpy
 import torch
 import matplotlib.pyplot as plt
 import numpy as np
+import imageio
+
 from pytorch3d.structures import Meshes
 from pytorch3d.renderer import (
     RasterizationSettings, MeshRenderer, MeshRasterizer, SoftPhongShader,
@@ -20,15 +22,16 @@ else:
 
 bpy.ops.wm.open_mainfile(filepath="transform_driver_demo.blend")
 # Camera and lights (customize if needed)
-R, T = look_at_view_transform(dist=5, elev=45, azim=45)
+R, T = look_at_view_transform(dist=12, elev=45, azim=60)
 cameras = PerspectiveCameras(R=R, T=T, device=device)
-lights = PointLights(device=device, location=[[0.0, 0.0, -3.0]])
+lights = PointLights(device=device, location=[[0.0, 3.0, 3.0]])
 
 # Basic renderer
+image_size = 512
 renderer = MeshRenderer(
     rasterizer=MeshRasterizer(
         cameras=cameras,
-        raster_settings=RasterizationSettings(image_size=512)
+        raster_settings=RasterizationSettings(image_size=image_size)
     ),
     shader=SoftPhongShader(device=device, cameras=cameras, lights=lights)
 )
@@ -76,7 +79,8 @@ def initialize_params(custom_props):
     params_assign_string += "opt_props = []\n"
     for prop in custom_props:
         params_assign_string += f"global {prop}\n"
-        params_assign_string += f"{prop} = torch.tensor([{custom_props[prop]}], device=device, requires_grad=True)\n"
+        # params_assign_string += f"{prop} = torch.tensor([{custom_props[prop]}], device=device, requires_grad=True)\n"
+        params_assign_string += f"{prop} = torch.tensor([1.0], device=device, requires_grad=True)\n" #Mess up the initial parameter so we see something interesting
         params_assign_string += f"opt_props.append({prop})\n"
         
     print(params_assign_string)
@@ -183,8 +187,13 @@ print(get_transform_update_string(drivers))
 
 #Optimize
 print(verts_tensor.shape)
-optimizer = torch.optim.Adam(opt_props, lr=0.1)
-with tqdm(range(100)) as titer:
+optimizer = torch.optim.Adam(opt_props, lr=0.02)
+
+num_epochs = 100
+epochs_per_save = 5
+gif_images = np.zeros((num_epochs//epochs_per_save, image_size, image_size, 3), dtype=np.uint8)
+
+with tqdm(range(num_epochs)) as titer:
     for i in titer:
         optimizer.zero_grad()
         matrix_world = update_transform()
@@ -193,6 +202,9 @@ with tqdm(range(100)) as titer:
         nverts = einsum(torch.cat([verts_tensor, ones], dim=-1), matrix_world,'b i v, j v-> b i j')
         mesh = Meshes(verts=nverts, faces=faces_tensor, textures=textures)
         cimage = renderer(mesh)
+        #Save the image into a GIF to show the training proces
+        if(not i % epochs_per_save):
+            gif_images[i//epochs_per_save] = (cimage[...,:3]*255).byte().detach().cpu().numpy()
 
         loss = torch.sum((cimage - target_image)**2)
  
@@ -200,3 +212,5 @@ with tqdm(range(100)) as titer:
         optimizer.step()
         titer.set_postfix(loss=loss.item(), scale1=opt_props[0].item())
     
+# Save GIF
+imageio.mimsave('driver_training_process.gif', gif_images, fps=len(gif_images))
