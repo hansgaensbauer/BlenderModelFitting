@@ -248,13 +248,8 @@ with tqdm(range(num_epochs)) as titer:
         R_roll[0,2,2] = cos
         R_roll[0,1,1] = 1
 
-        # print(R_roll)
-
-        # R_new = torch.bmm(R_roll,R)
         R_new = R_roll @ R
 
-        # print(R_new)
-        # Apply each of the transforms
         for j in range(len(transform_matrices)):
             matrix_world = transform_matrices[j]
             ones = torch.ones(verts_tensor_list[j].shape[0], verts_tensor_list[j].shape[1], 1, device=device)

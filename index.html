@@ -540,7 +540,28 @@ with tqdm(range(num_epochs)) as titer:
       <img src="Examples/outputs/photo_training_process.gif" width="312">
       <img src="Examples/outputs/photo_demo_training_loss_badangle.png" width="312">
       <p>
-        For many cases (like pick and place machines), the camera parameters are known ahead of time, and this won't be a problem. For cases like this photo where the camera position is not known, we can also optimize the camera angle (here we are training for only 100 iterations):
+        For many cases (like pick and place machines), the camera parameters are known ahead of time, and this won't be a problem. For cases like this photo where the camera position is not known, we can also optimize the camera roll and elevation in our training loop:
+      </p>
+<pre><code>R, T = look_at_view_transform(dist=14, elev=elevation, azim=0, device=device)
+cos = torch.cos(roll/100)
+sin = torch.sin(roll/100)
+
+ones = torch.ones((1), device=device)
+zeros = torch.zeros((1), device=device)
+
+R_roll = torch.zeros(1,3,3,device=device)
+R_roll[0,0,0] = cos
+R_roll[0,0,2] = -sin
+R_roll[0,2,0] = sin
+R_roll[0,2,2] = cos
+R_roll[0,1,1] = 1
+
+R_new = R_roll @ R
+
+cimage = renderer(scene, R=R_new, T=T)[0,...,3]
+loss = torch.sum((cimage - target_image)**2)</code></pre>
+      <p>
+         Here roll and elevation are tensors with <code>requires_grad=True</code>. It's worth noting that we cannot also optimize the depth, since there is no scale information in the photo. Training for 100 epochs:
       </p>
       <img src="Examples/outputs/photo_training_process_camera.gif" width="312">
       <img src="Examples/outputs/photo_demo_training_loss_camera.png" width="312">
