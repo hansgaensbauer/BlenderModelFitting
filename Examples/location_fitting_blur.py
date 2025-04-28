@@ -3,6 +3,7 @@ import torch
 import matplotlib.pyplot as plt
 import numpy as np
 import imageio
+import kornia.filters as K
 
 from pytorch3d.structures import Meshes, join_meshes_as_scene
 from pytorch3d.renderer import (
@@ -23,7 +24,7 @@ if torch.cuda.is_available():
 else:
     device = torch.device("cpu")
 
-bpy.ops.wm.open_mainfile(filepath="bolt.blend")
+bpy.ops.wm.open_mainfile(filepath="Blender Files/bolt.blend")
 # bpy.ops.wm.open_mainfile(filepath="bolt_nopos.blend")
 # Camera and lights (customize if needed)
 R, T = look_at_view_transform(dist=7, elev=40, azim=00)
@@ -81,6 +82,8 @@ for obj in target_collection.objects:
 scene = join_meshes_as_scene(meshes, True)
 
 target_image = renderer(scene, cameras=cameras, lights=lights)[0,...,3]
+# image_tensor shape: (N, C, H, W)
+target_image = K.gaussian_blur2d(target_image.unsqueeze(0).unsqueeze(0), (101,101), (10,10))[0,0]
 print(target_image.shape)
 # timage = (target_image[...,:3]*255).byte().detach().cpu().numpy()
 # imageio.imsave('location_training_process.png', timage[0])
@@ -93,7 +96,7 @@ control = bpy.data.objects["Control"]
 custom_props = {}
 
 #Randomize before optimization
-control["l_x"] = 1.2
+control["l_x"] = -3.2
 control["l_y"] = 0.0
 control["body_length"] = 2.3
 control["body_diameter"] = 0.78
@@ -230,13 +233,14 @@ for obj in target_collection.objects:
         textures_list.append(TexturesVertex(verts_features=vertex_colors))
 
 # print(verts_tensor.shape)
-optimizer = torch.optim.Adam(opt_props, lr=0.01)
+optimizer = torch.optim.Adam(opt_props, lr=0.03)
 # optimizer = torch.optim.SGD(opt_props, lr=0.00001, momentum=0.0001)
 
 num_epochs = 300
 epochs_per_save = 10
 gif_images = np.zeros((num_epochs//epochs_per_save, image_size, image_size, 3), dtype=np.uint8)
 
+losses = []
 with tqdm(range(num_epochs)) as titer:
     for i in titer:
         optimizer.zero_grad()
@@ -251,24 +255,28 @@ with tqdm(range(num_epochs)) as titer:
         scene = join_meshes_as_scene(meshes, True)
         
         cimage = renderer(scene, cameras=cameras, lights=lights)[0,...,3]
+        cimage = K.gaussian_blur2d(cimage.unsqueeze(0).unsqueeze(0), (101,101), (10,10))[0,0]
         #Save the image into a GIF to show the training proces
         if(not i % epochs_per_save):
-            simage = visrenderer(scene)
+            simage = visrenderer(scene).flip(1)
             gif_images[i//epochs_per_save] = (simage[...,:3]*255).byte().detach().cpu().numpy()
-            # for prop in opt_props:
-                # print(prop.item())
 
         loss = torch.sum((cimage - target_image)**2)
-        # loss = loss_fn(cimage[...,:3].permute(0, 3, 1, 2), target_image[...,:3].permute(0, 3, 1, 2))
+        losses.append(loss.item())
         loss.backward()
         optimizer.step()
-        # for p in opt_props:
-        #     p.data.clamp_(-10,3)
-        # opt_props[0].data.clamp(0)
-        # opt_props[1].data.clamp(0)
-        # opt_props[2].data.clamp(0)
-        # opt_props[3].data.clamp(0)
         titer.set_postfix(loss=loss.item(), length=opt_props[-1].item())
     
 # Save GIF
-imageio.mimsave('location_training_process.gif', gif_images, fps=len(gif_images)/2)
+default_duration = 50
+lag = 1000
+duration = [default_duration] * (len(gif_images)-1) + [lag]
+imageio.mimsave('Examples/outputs/location_training_process_translate.gif', gif_images, duration=duration, loop=0)
+
+lossfig = plt.figure(figsize=(4,4))
+plt.plot(losses)
+plt.xlabel("Iteration")
+plt.ylabel("MSE Loss")
+plt.title("Training Loss")
+plt.tight_layout()
+plt.savefig("Examples/outputs/bolt_demo_training_loss_translate.png", bbox_inches='tight')

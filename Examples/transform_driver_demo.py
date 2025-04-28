@@ -20,7 +20,7 @@ if torch.cuda.is_available():
 else:
     device = torch.device("cpu")
 
-bpy.ops.wm.open_mainfile(filepath="transform_driver_demo.blend")
+bpy.ops.wm.open_mainfile(filepath="Blender Files/transform_driver_demo.blend")
 # Camera and lights (customize if needed)
 R, T = look_at_view_transform(dist=12, elev=45, azim=60)
 cameras = PerspectiveCameras(R=R, T=T, device=device)
@@ -46,10 +46,8 @@ eval_cube = cube.evaluated_get(depsgraph).to_mesh()
 
 faces = np.array([[v for v in poly.vertices] for poly in cube.data.polygons], dtype=np.int32)
 verts = np.array([v.co[:] for v in cube.data.vertices], dtype=np.float32)
-print(np.shape(verts))
 #transform by world matrix
 verts_tx = np.array([cube.matrix_world @ v.co for v in eval_cube.vertices])
-print(np.shape(verts_tx))
 # verts_tx = np.array([v.co[:] for v in (cube.matrix_world @ cube.data.vertices[:])], dtype=np.float32)
 verts_tensor = torch.tensor(verts[np.newaxis,:,:], dtype=torch.float32, device=device)  # shape (1, V, 3)
 verts_tensor_tx = torch.tensor(verts_tx[np.newaxis,:,:], dtype=torch.float32, device=device)  # shape (1, V, 3)
@@ -131,8 +129,6 @@ def get_transform_update_string(drivers):
     vstr += "\treturn build_transform(location, rotation_euler, scale)\n"
     return vstr
 
-print(get_transform_update_string(drivers))
-
 # 4. Compute the transform matrix using the drivers
 def build_transform(location, rotation, scale):
 
@@ -192,6 +188,7 @@ optimizer = torch.optim.Adam(opt_props, lr=0.02)
 num_epochs = 100
 epochs_per_save = 5
 gif_images = np.zeros((num_epochs//epochs_per_save, image_size, image_size, 3), dtype=np.uint8)
+losses = []
 
 with tqdm(range(num_epochs)) as titer:
     for i in titer:
@@ -207,10 +204,21 @@ with tqdm(range(num_epochs)) as titer:
             gif_images[i//epochs_per_save] = (cimage[...,:3]*255).byte().detach().cpu().numpy()
 
         loss = torch.sum((cimage - target_image)**2)
- 
+        losses.append(loss.item())
         loss.backward()
         optimizer.step()
         titer.set_postfix(loss=loss.item(), scale1=opt_props[0].item())
     
 # Save GIF
-imageio.mimsave('driver_training_process.gif', gif_images, fps=len(gif_images))
+default_duration = 50
+lag = 1000
+duration = [default_duration] * (len(gif_images)-1) + [lag]
+imageio.mimsave('Examples/outputs/driver_training_process.gif', gif_images, duration=duration, loop=0)
+
+lossfig = plt.figure(figsize=(4,4))
+plt.plot(losses)
+plt.xlabel("Iteration")
+plt.ylabel("MSE Loss")
+plt.title("Training Loss")
+plt.tight_layout()
+plt.savefig("Examples/outputs/driver_demo_training_loss.png", bbox_inches='tight')

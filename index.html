@@ -178,7 +178,7 @@
         Blender, and the final mesh in Blender can be updated after the optimization
         process.
       </p>
-      <h2>Blender Transforms</h2>
+      <h2>Parameterizations in Blender</h2>
       <p>
         Blender is a free and open source program for 3D modelling, sculpting, VFX,
         simulation, video editing, animation, and a whole host of other features. It is
@@ -215,156 +215,58 @@
         custom parameters for each of the variables we wish to optimize. Then, each of the
         drivers that we define for the objects we want to optimize refer to the properties
         of the control object. This is especially convenient because we need to compute
-        the world transformation matrix in Pytorch in order to use it in the optimization.
-        The series of steps to evaluate the transformation matrix in Pytorch looks like
-        this:
+        the world transformation matrix in Pytorch in order to use it in the optimization. We can extract each of the control object parameters and assign them to gradient-enabled tensors like this:
       </p>
-      <ol>
-        <li>Extract all of the custom properties from the empty control object</li>
-        <li>Extract the list of drivers from the objects in the scene</li>
-        <li>Evaluate each driver using the custom properties as dependencies</li>
-        <li>Compute the transform matrix using the drivers</li>
-      </ol>
-      <p>
-        In practice, this is further complicated by the fact that all of the expressions
-        for the different dependencies are strings, which need to be parsed at runtime.
-        Furthermore, it is not enough to evaluate each expression once and call it good:
-        we need to build an executable pipeline in Pytorch that can compute new transform
-        matrices without re-accessing the blender file. To do this, we build an
-        update_matrix() function from the drivers/parameters at runtime:
-      </p>
-      <pre><code> # 1. Extract all of the custom properties from the empty control object
-  control = bpy.data.objects["Control"]
-  custom_props = {}
+    </p>
+    <pre><code>control = bpy.data.objects["Control"]
+custom_props = {}
 
-  if control is not None:
-      for key, value in control.items():
-          if not key.startswith("_"):
-              custom_props[key] = value
+if control is not None:
+    for key, value in control.items():
+        if not key.startswith("_"):
+            custom_props[key] = value
 
-  #Assign each of the custom properties to custom variables
-  def initialize_params(custom_props):
-      params_assign_string = ""
-      for prop in custom_props:
-          params_assign_string += f"global {prop}\n"
-          params_assign_string += f"{prop} = torch.tensor([{custom_props[prop]}], device=device, requires_grad=True)\n"
-      exec(params_assign_string)
+#Assign each of the custom properties to custom variables
+def initialize_params(custom_props):
+    params_assign_string = "global opt_props\n"
+    params_assign_string += "opt_props = []\n"
+    for prop in custom_props:
+        params_assign_string += f"global {prop}\n"
+        params_assign_string += f"{prop} = torch.tensor([{custom_props[prop]}], device=device, requires_grad=True)\n"
+        params_assign_string += f"opt_props.append({prop})\n"
+        
+    print(params_assign_string)
+    exec(params_assign_string)
 
-  initialize_params(custom_props)
-
-  # 2. Extract the list of drivers from the objects in the scene
-  obj = bpy.data.objects["Target"]
-  drivers = {}
-  #defaults
-  drivers["location"] =       [{"exp":"0","vars":{}},
-                                {"exp":"0","vars":{}},
-                                {"exp":"0","vars":{}}]
-
-  drivers["rotation_euler"] = [{"exp":"0","vars":{}},
-                                {"exp":"0","vars":{}},
-                                {"exp":"0","vars":{}}]
-
-  drivers["scale"] =          [{"exp":"1","vars":{}},
-                                {"exp":"1","vars":{}},
-                                {"exp":"1","vars":{}}]
-
-  if obj.animation_data and obj.animation_data.drivers:
-      for driver in obj.animation_data.drivers:
-          drivers[driver.data_path][driver.array_index]["exp"] = driver.driver.expression
-          variables = {}
-          for var in driver.driver.variables:
-              variables[var.name] = var.targets[0].data_path
-          drivers[driver.data_path][driver.array_index]["vars"] = variables
-  else:
-      print("No drivers on this object.")
-
-  # 3. Evaluate each driver using the custom properties as dependencies
-
-  def get_transform_update_string(drivers):
-      vstr = "def update_transform():\n"
-      for driver in drivers:
-          vstr += f"\t{driver} = []\n"
-          for axis in range(3):
-              vars = drivers[driver][axis]["vars"]
-              for var in vars:
-                  vstr += f"\t{var} = {vars[var][2:-2]}\n"
-              exp = drivers[driver][axis]["exp"]
-              vstr += f"\t{driver}.append({exp})\n"
-          vstr += f"\t{driver} = torch.tensor({driver})\n"
-      vstr += "\treturn build_transform(location, rotation_euler, scale)\n"
-      return vstr
-
-  print(get_transform_update_string(drivers))
-
-  # 4. Compute the transform matrix using the drivers
-  def build_transform(location, rotation, scale):
-      lx, ly, lz = location
-      sx, sy, sz = scale
-      cx, cy, cz = torch.cos(rotation)
-      sxr, syr, szr = torch.sin(rotation)
-
-      Rx = torch.tensor([
-          [1, 0, 0],
-          [0, cx, -sxr],
-          [0, sxr, cx]
-      ])
-
-      Ry = torch.tensor([
-          [cy, 0, syr],
-          [0, 1, 0],
-          [-syr, 0, cy]
-      ])
-
-      Rz = torch.tensor([
-          [cz, -szr, 0],
-          [szr, cz, 0],
-          [0, 0, 1]
-      ])
-      R = Rz @ Ry @ Rx
-      S = torch.diag(torch.tensor([sx, sy, sz]))
-      RS = R @ S
-
-      M = torch.eye(4)
-      M[:3, :3] = RS
-      M[:3, 3] = torch.tensor([lx, ly, lz])
-
-      return M
-
-  exec(get_transform_update_string(drivers))
-  print(update_transform())
-      </code></pre>
-      <p>
-        As an example, for a cube with rotation and the x axis scale that are both driven
-        by a single parameter, this code produces the following output:
-      </p>
-      <pre><code> GPU Detected
-  Read blend: "C:\Users\hangaen\Desktop\BlenderModelFitting\transform_driver_demo.blend"    
-  {'location': [{'exp': '0', 'vars': {}}, {'exp': '0', 'vars': {}}, {'exp': '0', 'vars': {}}], 'rotation_euler': [{'exp': '0.3*var', 'vars': {'var': '["scale1"]'}}, {'exp': '0', 'vars': {}}, {'exp': '0', 'vars': {}}], 'scale': [{'exp': '2*var', 'vars': {'var': '["scale1"]'}}, {'exp': '1', 'vars': {}}, {'exp': '1', 'vars': {}}]}
-  def update_transform():
-          location = []
-          location.append(0)
-          location.append(0)
-          location.append(0)
-          location = torch.tensor(location)
-          rotation_euler = []
-          var = scale1
-          rotation_euler.append(0.3*var)
-          rotation_euler.append(0)
-          rotation_euler.append(0)
-          rotation_euler = torch.tensor(rotation_euler)
-          scale = []
-          var = scale1
-          scale.append(2*var)
-          scale.append(1)
-          scale.append(1)
-          scale = torch.tensor(scale)
-          return build_transform(location, rotation_euler, scale)
-  
-  tensor([[ 2.0000,  0.0000,  0.0000,  0.0000],
-          [ 0.0000,  0.9553, -0.2955,  0.0000],
-          [ 0.0000,  0.2955,  0.9553,  0.0000],
-          [ 0.0000,  0.0000,  0.0000,  1.0000]])
+initialize_params(custom_props)
 </code></pre>
+      <p>
+        As an example, for a Blender model of a parameterized bolt, the snippet above creates (and executes) the following code:
+      </p>
+      <pre><code>global opt_props
+opt_props = []
+global head_thickness
+head_thickness = torch.tensor([0.5], device=device, requires_grad=True)
+opt_props.append(head_thickness)
+global body_diameter
+body_diameter = torch.tensor([0.78], device=device, requires_grad=True)
+opt_props.append(body_diameter)
+global l_x
+l_x = torch.tensor([1.2], device=device, requires_grad=True)
+opt_props.append(l_x)
+global l_y
+l_y = torch.tensor([0.0], device=device, requires_grad=True)
+opt_props.append(l_y)
+global head_diameter
+head_diameter = torch.tensor([3.0], device=device, requires_grad=True)
+opt_props.append(head_diameter)
+global body_length
+body_length = torch.tensor([2.3], device=device, requires_grad=True)
+opt_props.append(body_length)
+</code></pre>
+<p>
+  The initial values of each of the properties are pulled from the Blender file.
+</p>
       <h3>Shape Keys</h3>
       <p>
         Shape Keys are a Blender feature for creating arbitrary parametric mesh
@@ -393,23 +295,264 @@
   verts = basis_verts + keyval * (key1_verts - basis_verts)
   mesh = Meshes(verts=verts, faces=faces_tensor, textures=textures)
 </code></pre>
+    <p>
+      Here, <code>keyval</code> is the gradient-enabled tensor used for optimization.
+    </p>
+    <h2>Parameterized Mesh Fitting</h2>
+    In order to optimize the mesh using Pytorch, it is not enough to extract the parameters and compute the tranformations once. Rather, we need to extract the entire dependency graph and automatically re-implement it in Pytorch so that it is fully differentiable. 
+    <h3>Building a PyTorch Pipeline from Blender Parameterizations</h3>
+    Blender gives us access to the expressions used to evaluate each driver, and it is relatively straightforward to compute the 4x4 homogeneous transformation matrix from the updated driver values in Pytorch. At a high level, our approach looks like this:
+    <ol>
+      <li>Extract all of the custom properties from the empty control object</li>
+      <li>Extract the list of drivers from the objects in the scene</li>
+      <li>Automatically build a function that computes the drivers from the control object properties in Pytoch</li>
+      <li>Use this function to compute an updated transformation matrix during training</li>
+    </ol>
+      <p>
+        In practice, this is complicated by the fact that all of the expressions
+        for the different dependencies are strings, which need to be parsed at runtime.
+        To do this, we build an update_matrix() function from the drivers/parameters at runtime:
+      </p>
+      <pre><code>obj = bpy.data.objects["Target"]
+drivers = {}
+#defaults
+drivers["location"] =       [{"exp":"0","vars":{}},
+                              {"exp":"0","vars":{}},
+                              {"exp":"0","vars":{}}]
 
-      <h2>Parameterized Mesh Fitting</h2>
+drivers["rotation_euler"] = [{"exp":"0","vars":{}},
+                              {"exp":"0","vars":{}},
+                              {"exp":"0","vars":{}}]
 
-      The screw mesh is composite!
-      <h2>Extracting 2D Position</h2>]
+drivers["scale"] =          [{"exp":"1","vars":{}},
+                              {"exp":"1","vars":{}},
+                              {"exp":"1","vars":{}}]
+
+if obj.animation_data and obj.animation_data.drivers:
+    for driver in obj.animation_data.drivers:
+        drivers[driver.data_path][driver.array_index]["exp"] = driver.driver.expression
+        variables = {}
+        for var in driver.driver.variables:
+            variables[var.name] = var.targets[0].data_path
+        drivers[driver.data_path][driver.array_index]["vars"] = variables
+else:
+    print("No drivers on this object.")
+
+def get_transform_update_string(drivers):
+    vstr = "def update_transform():\n"
+    for driver in drivers:
+        vstr += f"\t{driver} = torch.zeros(3, device=device)\n"
+        for axis in range(3):
+            vars = drivers[driver][axis]["vars"]
+            for var in vars:
+                vstr += f"\t{var} = {vars[var][2:-2]}\n"
+            vstr
+            exp = drivers[driver][axis]["exp"]
+            vstr += f"\t{driver}[{axis}] = {exp}\n"
+    vstr += "\treturn build_transform(location, rotation_euler, scale)\n"
+    return vstr
+</code></pre>
+      <p>
+        As an example, for a cube with rotation and the x axis scale that are both driven
+        by a single parameter, this code produces the following output:
+      </p>
+<pre><code>def update_transform():
+  location = torch.zeros(3, device=device)
+  location[0] = 0
+  location[1] = 0
+  location[2] = 0
+  rotation_euler = torch.zeros(3, device=device)
+  var = scale1
+  rotation_euler[0] = 0.3*var
+  rotation_euler[1] = 0
+  rotation_euler[2] = 0
+  scale = torch.zeros(3, device=device)
+  var = scale1
+  scale[0] = 2*var
+  scale[1] = 1
+  scale[2] = 1
+  return build_transform(location, rotation_euler, scale)
+</code></pre>
+      <p>
+        In this case, <code>scale1</code> has already been defined as a global, gradient-enabled tensor by the call <code>initialize_params</code>. Finally, we need to implement <code>build_transform():</code>
+      </p>
+<pre><code>def build_transform(location, rotation, scale):
+  cx, cy, cz = torch.cos(rotation)
+  sxr, syr, szr = torch.sin(rotation)
+
+  ones = torch.ones((), device=device)
+  zeros = torch.zeros((), device=device)
+
+  Rx = torch.stack([
+      torch.stack([ones, zeros, zeros], dim=-1),
+      torch.stack([zeros, cx, -sxr], dim=-1),
+      torch.stack([zeros, sxr, cx], dim=-1)
+  ], dim=0)
+
+  Ry = torch.stack([
+      torch.stack([cy, zeros, syr], dim=-1),
+      torch.stack([zeros, ones, zeros], dim=-1),
+      torch.stack([-syr, zeros, cy], dim=-1)
+  ], dim=0)
+
+  Rz = torch.stack([
+      torch.stack([cz, -szr, zeros], dim=-1),
+      torch.stack([szr, cz, zeros], dim=-1),
+      torch.stack([zeros, zeros, ones], dim=-1)
+  ], dim=0)
+
+  R = Rz @ Ry @ Rx
+
+  S = torch.diag(torch.stack([scale[0], scale[1], scale[2]]))
+  RS = R @ S
+
+  loc = location.view(3, 1)
+  upper = torch.cat([RS, loc], dim=1)
+  
+  return upper.to(dtype=torch.float32)
+</code></pre>
+      <p>
+        This returns a 3x4 tensor that transforms homogeneous vertex positions into non-homogeneous transformed vertex positions.
+      </p>
+      <h3>Training</h3>
+      <p>
+        With all this in place, training is straightforward. In each iteration, we use <code>update_transform()</code> to obtain an updated transform matrix from the optimization parameters, transform the mesh, render, and compute a loss. Then we backpropagate to the optimization parameters.
+      </p>
+<pre><code>optimizer = torch.optim.Adam(opt_props, lr=0.02)
+
+num_epochs = 100
+epochs_per_save = 5
+gif_images = np.zeros((num_epochs//epochs_per_save, image_size, image_size, 3), dtype=np.uint8)
+
+with tqdm(range(num_epochs)) as titer:
+    for i in titer:
+        optimizer.zero_grad()
+        matrix_world = update_transform()
+
+        ones = torch.ones(verts_tensor.shape[0], verts_tensor.shape[1], 1, device=verts_tensor.device)
+        nverts = einsum(torch.cat([verts_tensor, ones], dim=-1), matrix_world,'b i v, j v-> b i j')
+        mesh = Meshes(verts=nverts, faces=faces_tensor, textures=textures)
+        cimage = renderer(mesh)
+        #Save the image into a GIF to show the training proces
+        if(not i % epochs_per_save):
+            gif_images[i//epochs_per_save] = (cimage[...,:3]*255).byte().detach().cpu().numpy()
+
+        loss = torch.sum((cimage - target_image)**2)
+ 
+        loss.backward()
+        optimizer.step()
+        titer.set_postfix(loss=loss.item(), scale1=opt_props[0].item())
+</code></pre>
+      <p>For the tiny example with a cube parameterized such that the length and x axis rotation are both driven by a single parameter, training for 100 iterations looks like this:</p>
+      <img src="Examples/outputs/driver_training_process.gif" width="312">
+      <img src="Examples/outputs/driver_demo_training_loss.png" width="312">
+      <h3>Optimizing Shape Keys</h3>
+      <p>
+        Optimizing shape keys works exactly the same way. The shape keys are applied before the object transformation matrix is applied, and the key parameter is included with the other control parameters in the optimizer. A very simple example where the top face of a cube is distorted and then optimized back to the perfect cube for 100 iterations looks like this:
+      </p>
+      <img src="Examples/outputs/shapekey_training_process.gif" width="312">
+      <img src="Examples/outputs/shapekey_demo_training_loss.png" width="312">
+      <h3>Composite Meshes and Extracting 2D Location</h3>
+      <p>
+        A single transform matrix is not terribly useful on its own, since a single affine transformation is too simple to parameterize an interesting range of possible shapes. However, the driver+transform matrix approach is readily extended to more complicated blender files featuring composite meshes. Each mesh in the scene can have its own parameterized transformations and shape keys, and the drivers for these transformations can depend on properties of other meshes. 
+        <br><br>
+        For example, the model of the bolt shown below consists of two cylinders: one for the head and one for the body of the bolt. The height and diameter of each cylinder are parameterized, and the body of the bolt is translated so that it stays attached to the head as the head height changes. Furthermore, the entire bolt has a parameterized XY location, which is intended to capture an unknown location on a known ground plane. The photo to the right shows the parameters defined in Blender.
+      </p>
+      <img src="Examples/bolt.PNG" width="312">
+      <img src="Examples/bolt_params.PNG" width="275">
+      <p>
+        The function <code>get_transform_update_string()</code> must be updated to produce a function that returns a list of transform matrices, one for each mesh in the target collection (Blender's way of denoting a composite mesh)
+      </p>
+<pre><code>def get_transform_update_string(drivers):
+  vstr = "def update_transform():\n"
+  vstr += "\ttransform_matrices = []\n\n"
+  for drivers in drivers_list:
+      for driver in drivers:
+          vstr += f"\t{driver} = torch.zeros(3, device=device)\n"
+          for axis in range(3):
+              vars = drivers[driver][axis]["vars"]
+              for var in vars:
+                  vstr += f"\t{var} = {vars[var][2:-2]}\n"
+              vstr
+              exp = drivers[driver][axis]["exp"]
+              vstr += f"\t{driver}[{axis}] = {exp}\n"
+      vstr += "\ttransform_matrices.append(build_transform(location, rotation_euler, scale))\n\n"
+  vstr += "\treturn transform_matrices\n"
+  return vstr</code></pre>
+      <p>
+        The training loop now includes an inner loop that transforms each mesh in the scene. 
+      </p>
+<pre><code>with tqdm(range(num_epochs)) as titer:
+  for i in titer:
+      optimizer.zero_grad()
+      transform_matrices = update_transform()
+      meshes = []
+      # Apply each of the transforms
+      for j in range(len(transform_matrices)):
+          matrix_world = transform_matrices[j]
+          ones = torch.ones(verts_tensor_list[j].shape[0], verts_tensor_list[j].shape[1], 1, device=device)
+          nverts = einsum(torch.cat([verts_tensor_list[j], ones], dim=-1), matrix_world,'b i v, j v-> b i j')
+          meshes.append(Meshes(verts=nverts, faces=faces_tensor_list[j], textures=textures_list[j]))
+      scene = join_meshes_as_scene(meshes, True)
+      
+      cimage = renderer(scene, cameras=cameras, lights=lights)[0,...,3]
+      #Save the image into a GIF to show the training proces
+      if(not i % epochs_per_save):
+          simage = visrenderer(scene)
+          gif_images[i//epochs_per_save] = (simage[...,:3]*255).byte().detach().cpu().numpy()
+
+      loss = torch.sum((cimage - target_image)**2)
+
+      loss.backward()
+      optimizer.step()
+      titer.set_postfix(loss=loss.item(), length=opt_props[-1].item())
+</code></pre>
+      <p>This code can accept any number of objects in the composite mesh. Training for 300 epochs gives the following results:
+      </p>
+      <img src="Examples/outputs/location_training_process.gif" width="312">
+      <img src="Examples/outputs/bolt_demo_training_loss.png" width="312">
+      <p>
+        One significant challenge with fitting the XY location occurs when there is insufficient overlap between the starting mesh and the target image. In these cases, MSE loss does not produce enough of a gradient that points towards the correct location since the location does not significantly affect the loss until the mesh and target object are close enough that the "fuzziness" from the differentiable renderer has a significant amount of overlap. In these cases, the model will sometimes "cheat" by attempting to shrink the target mesh to reduce the error in the pixels that the target mesh is occupyting:
+      </p>
+      <img src="Examples/outputs/location_training_process_translate_og.gif" width="312">
+      <img src="Examples/outputs/bolt_demo_training_loss_translate_og.png" width="312">
+      <p>
+        Notice that the loss "converges" to a large nonzero value. One possible fix is to blur the images so there is always some overlap. Anecdotally, doing this through the differential renderer produced strange side effects, so instead I implemented it using kornia.gaussian_blur2d with a standard devation of 10 and a kernel size of (101,101). The new target image looks like this:
+      </p>
+      <img src="Examples/outputs/bolt_blur.png" width="312">
+      <p>
+        And the results for the same mesh fitting problem and hyperparameters are much better:
+      </p>
+      <img src="Examples/outputs/location_training_process_translate.gif" width="312">
+      <img src="Examples/outputs/bolt_demo_training_loss_translate.png" width="312">
+      <p>
+        Of course, this is not without tradeoffs. The final fit suffers from the loss of detail from the blur: this results in the bolt head being slightly too thin even though the loss converges. Additionally, while the blur causes training to converge in slightly fewer iterations, it triples (3m21s vs 1m04s) the amount of time it takes to train because the blur kernel must be very large to get some overlap when the objects start far away. It may be possible to dynamically adjust the level of blur during training to get the best of both worlds but this is outside the scope of this project.
+      </p>
       <h2>Fitting Photos</h2>
+      <p>
+        For the proposed technique to be useful, it must be able to handle real photos as target images, rather than "perfect" renderings created in Pytorch3D. The optimizer uses silhouette loss, so the input images must be preprocessed by reducing them to a single channel. For this demonstration, I have further reduced the image to a 1-bit mask to remove the effects of lighting/shadows.
+      </p>
+      <img src="Examples/bolt_image.png" width="312">
+      <img src="Examples/outputs/bolt_photo_mask.png" width="312">
+      <p>
+        Since this photo was taken at a different angle than the angle of the camera in the renderer, it is not possible to get a perfect match. However, the training does still converge:
+      </p>
+      <img src="Examples/outputs/photo_training_process.gif" width="312">
+      <img src="Examples/outputs/photo_demo_training_loss_badangle.png" width="312">
+      <p>
+        For many cases (like pick and place machines), the camera parameters are known ahead of time, and this won't be a problem. For cases like this photo where the camera position is not known, we can also optimize the camera angle (here we are training for only 100 iterations):
+      </p>
+      <img src="Examples/outputs/photo_training_process_camera.gif" width="312">
+      <img src="Examples/outputs/photo_demo_training_loss_camera.png" width="312">
+      <p>
+        The initial dimensions are the same as in the experiment above - it's hard to see the initial state since it changes very quickly at the start of training.
+      </p>
       <h2>Comparison to Existing Techniques</h2>
       <h2>Conclusion</h2>
-      <p></p>
-      <p>Here’s a paragraph with a <code>code snippet</code> and a blockquote:</p>
-
-      <blockquote>
-        "This is a sample quote that adds emphasis to your content."
-      </blockquote>
-
-      <h3>Code Example</h3>
-
+      <ul>
+        <li>Not ideal using silhouette</li>
+        <li>Very slow</li>
+      </ul>
       <h2>References</h2>
       <ol>
         <li>

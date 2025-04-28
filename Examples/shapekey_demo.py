@@ -20,7 +20,7 @@ if torch.cuda.is_available():
 else:
     device = torch.device("cpu")
 
-bpy.ops.wm.open_mainfile(filepath="shapekey_demo.blend")
+bpy.ops.wm.open_mainfile(filepath="Blender Files/shapekey_demo.blend")
 
 # Camera and lights (customize if needed)
 R, T = look_at_view_transform(dist=3, elev=60, azim=20)
@@ -70,6 +70,7 @@ verts = torch.zeros_like(basis_verts, requires_grad=True)
 
 num_epochs = 100
 epochs_per_save = 5
+losses = []
 gif_images = np.zeros((num_epochs//epochs_per_save, image_size, image_size, 3), dtype=np.uint8)
 with tqdm(range(num_epochs)) as titer:
     for i in titer:
@@ -85,9 +86,21 @@ with tqdm(range(num_epochs)) as titer:
             gif_images[i//epochs_per_save] = (cimage[...,:3]*255).byte().detach().cpu().numpy()
 
         loss = torch.sum((cimage - target_image)**2)
+        losses.append(loss.item())
         loss.backward()
         optimizer.step()
         titer.set_postfix(loss=loss.item(), keyval=keyval.item())
 
 # Save GIF
-imageio.mimsave('shapekey_training_process.gif', gif_images, fps=len(gif_images))
+default_duration = 50
+lag = 1000
+duration = [default_duration] * (len(gif_images)-1) + [lag]
+imageio.mimsave('Examples/outputs/shapekey_training_process.gif', gif_images, duration=duration, loop=0)
+
+lossfig = plt.figure(figsize=(4,4))
+plt.plot(losses)
+plt.xlabel("Iteration")
+plt.ylabel("MSE Loss")
+plt.title("Training Loss")
+plt.tight_layout()
+plt.savefig("Examples/outputs/shapekey_demo_training_loss.png", bbox_inches='tight')

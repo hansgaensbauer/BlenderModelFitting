@@ -8,7 +8,7 @@ from PIL import Image
 from pytorch3d.structures import Meshes, join_meshes_as_scene
 from pytorch3d.renderer import (
     RasterizationSettings, MeshRenderer, MeshRasterizer, SoftPhongShader,
-    SoftSilhouetteShader, PerspectiveCameras, PointLights, TexturesVertex, look_at_view_transform
+    SoftSilhouetteShader, FoVPerspectiveCameras, PointLights, TexturesVertex, look_at_view_transform
 )
 
 from tqdm import tqdm 
@@ -21,11 +21,10 @@ if torch.cuda.is_available():
 else:
     device = torch.device("cpu")
 
-bpy.ops.wm.open_mainfile(filepath="bolt.blend")
+bpy.ops.wm.open_mainfile(filepath="Blender Files/bolt.blend")
 # bpy.ops.wm.open_mainfile(filepath="bolt_nopos.blend")
 # Camera and lights (customize if needed)
-R, T = look_at_view_transform(dist=7, elev=40, azim=00)
-cameras = PerspectiveCameras(R=R, T=T, device=device)
+cameras = FoVPerspectiveCameras(device=device)
 lights = PointLights(device=device, location=[[0.0, 0.0, 3.0]])
 
 sigma = 1e-4
@@ -60,7 +59,7 @@ meshes = []
 textures = []
 color = torch.tensor([0.5, 0.5, 0.5], device=device)  # light gray
 
-img_path = 'bolt_image.png'
+img_path = 'Examples/bolt_image.png'
 image = torch.tensor(np.array(Image.open(img_path)), device=device)
 image_gs = np.array(Image.open(img_path).convert('L'))
 # Apply threshold (e.g., 128) to convert to 1-bit
@@ -69,7 +68,7 @@ binary_array = (image_gs < threshold).astype(np.uint8)  # 1 for above threshold,
 
 target_image = (torch.tensor(binary_array, dtype=torch.float32, device=device)).flip(-2)
 
-# plt.imshow(image.cpu().numpy())  # Only show the first image in the batch
+# plt.imshow(target_image.cpu().numpy())  # Only show the first image in the batch
 # plt.axis("off")
 # plt.show()
 
@@ -78,7 +77,7 @@ control = bpy.data.objects["Control"]
 custom_props = {}
 
 #Randomize before optimization
-control["l_x"] = 1.2
+control["l_x"] = 0.0
 control["l_y"] = 0.0
 control["body_length"] = 2.3
 control["body_diameter"] = 0.78
@@ -214,19 +213,47 @@ for obj in target_collection.objects:
         vertex_colors = color[None, None, :].expand(verts_tensor_list[-1].shape)    # (1, V, 3)
         textures_list.append(TexturesVertex(verts_features=vertex_colors))
 
-# print(verts_tensor.shape)
-optimizer = torch.optim.Adam(opt_props, lr=0.01)
+roll = torch.tensor([0.0], device=device, requires_grad=True)
+elevation = torch.tensor([50.0], device=device, requires_grad=True)
+dist = torch.tensor([14.0], device=device, requires_grad=True)
+opt_props.append(roll)
+# opt_props.append(elevation)
+# opt_props.append(dist)
+
+optimizer = torch.optim.Adam(opt_props, lr=0.12)
 # optimizer = torch.optim.SGD(opt_props, lr=0.00001, momentum=0.0001)
 
-num_epochs = 300
+num_epochs = 100
 epochs_per_save = 10
 gif_images = np.zeros((num_epochs//epochs_per_save, image_size, image_size, 3), dtype=np.uint8)
-
+losses = []
 with tqdm(range(num_epochs)) as titer:
     for i in titer:
         optimizer.zero_grad()
         transform_matrices = update_transform()
         meshes = []
+        
+        R, T = look_at_view_transform(dist=dist, elev=elevation, azim=00, device=device)
+        # print(R)
+        cos = torch.cos(roll/100)
+        sin = torch.sin(roll/100)
+
+        ones = torch.ones((1), device=device)
+        zeros = torch.zeros((1), device=device)
+
+        R_roll = torch.zeros(1,3,3,device=device)
+        R_roll[0,0,0] = cos
+        R_roll[0,0,2] = -sin
+        R_roll[0,2,0] = sin
+        R_roll[0,2,2] = cos
+        R_roll[0,1,1] = 1
+
+        # print(R_roll)
+
+        # R_new = torch.bmm(R_roll,R)
+        R_new = R_roll @ R
+
+        # print(R_new)
         # Apply each of the transforms
         for j in range(len(transform_matrices)):
             matrix_world = transform_matrices[j]
@@ -235,10 +262,14 @@ with tqdm(range(num_epochs)) as titer:
             meshes.append(Meshes(verts=nverts, faces=faces_tensor_list[j], textures=textures_list[j]))
         scene = join_meshes_as_scene(meshes, True)
         
-        cimage = renderer(scene, cameras=cameras, lights=lights)[0,...,3]
+        cimage = renderer(scene, R=R_new, T=T)[0,...,3]
+
+        # plt.imshow(cimage.detach().cpu().numpy())  # Only show the first image in the batch
+        # plt.axis("off")
+        # plt.show()
         #Save the image into a GIF to show the training proces
         if(not i % epochs_per_save):
-            simage = visrenderer(scene).flip(1)
+            simage = visrenderer(scene, R=R_new, T=T).flip(1)
             rgb_render = simage[..., :3]
             alpha_render = (simage[..., 3:] > 0.1).float()
             masked_render = alpha_render * rgb_render
@@ -249,8 +280,10 @@ with tqdm(range(num_epochs)) as titer:
                 # print(prop.item())
 
         loss = torch.sum((cimage - target_image)**2)
+        losses.append(loss.item())
         # loss = loss_fn(cimage[...,:3].permute(0, 3, 1, 2), target_image[...,:3].permute(0, 3, 1, 2))
         loss.backward()
+        # roll.grad /= 10000
         optimizer.step()
         # for p in opt_props:
         #     p.data.clamp_(-10,3)
@@ -258,7 +291,21 @@ with tqdm(range(num_epochs)) as titer:
         # opt_props[1].data.clamp(0)
         # opt_props[2].data.clamp(0)
         # opt_props[3].data.clamp(0)
-        titer.set_postfix(loss=loss.item(), length=opt_props[-1].item())
+        titer.set_postfix(loss=loss.item(), roll=roll.item(), elev=elevation.item(), d=dist.item())
     
+
+print(opt_props)
+
 # Save GIF
-imageio.mimsave('photo_training_process.gif', gif_images, fps=len(gif_images)/2)
+default_duration = 50
+lag = 1000
+duration = [default_duration] * (len(gif_images)-1) + [lag]
+imageio.mimsave('Examples/outputs/photo_training_process_camera.gif', gif_images, duration=duration, loop=0)
+
+lossfig = plt.figure(figsize=(4,4))
+plt.plot(losses)
+plt.xlabel("Iteration")
+plt.ylabel("MSE Loss")
+plt.title("Training Loss")
+plt.tight_layout()
+plt.savefig("Examples/outputs/photo_demo_training_loss_camera.png", bbox_inches='tight')
