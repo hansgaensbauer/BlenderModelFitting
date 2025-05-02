@@ -8,7 +8,7 @@
     <style>
       body {
         font-family: system-ui, sans-serif;
-        max-width: 700px;
+        max-width: 900px;
         margin: 2rem auto;
         padding: 1rem;
         line-height: 1.6;
@@ -166,7 +166,11 @@
         parametric transformations that give us an intuitive way of defining degres of
         freedom for our model.
       </p>
-      <img src="" alt="Another photo? Parametric model GIF?" />
+      <figure>
+      <img src="Examples/blender_transforms.gif" alt="Example Blender transformations and shape keys" />
+        <figcaption><b>Figure 2:</b> Example Blender transformations and shape keys. The scale, position, and rotation 
+        of the monkey are driven together, and a shape key is used to deform the monkey's eyebrows.</figcaption>
+      </figure>
       <p>
         Unfortunately, because Blender is not implemented in PyTorch, none of the mesh
         updates can be differentiated by Pytorch. This is a deeper problem inherent in any
@@ -184,7 +188,12 @@
         simulation, video editing, animation, and a whole host of other features. It is
         extremely well supported, meaning it is very straightforward to learn how to use
         it to create custom parameterized models using online tutorials.
-        <br /><br />
+      </p>
+        <video width = 800 controls>
+          <source src="Examples/blender_setup.mp4" type="video/mp4">
+        Your browser does not support the video tag.
+        </video>
+        <p>
         In Blender, meshes are edited in "Edit Mode", which gives fine control over
         individual mesh vertices. Afterward, the finished mesh can be further transformed
         and positioned in "Object Mode", which is where the render and scene are set up.
