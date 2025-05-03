@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import imageio
 from PIL import Image
+import time
 
 from pytorch3d.structures import Meshes, join_meshes_as_scene
 from pytorch3d.renderer import (
@@ -218,8 +219,10 @@ for obj in target_collection.objects:
 optimizer = torch.optim.Adam(opt_props, lr=0.01)
 # optimizer = torch.optim.SGD(opt_props, lr=0.00001, momentum=0.0001)
 
-num_epochs = 300
+num_epochs = 20
 epochs_per_save = 10
+render_times = []
+bp_times = []
 gif_images = np.zeros((num_epochs//epochs_per_save, image_size, image_size, 3), dtype=np.uint8)
 losses = []
 with tqdm(range(num_epochs)) as titer:
@@ -234,8 +237,10 @@ with tqdm(range(num_epochs)) as titer:
             nverts = einsum(torch.cat([verts_tensor_list[j], ones], dim=-1), matrix_world,'b i v, j v-> b i j')
             meshes.append(Meshes(verts=nverts, faces=faces_tensor_list[j], textures=textures_list[j]))
         scene = join_meshes_as_scene(meshes, True)
-        
+        rendertime_start = time.perf_counter()
         cimage = renderer(scene, cameras=cameras, lights=lights)[0,...,3]
+        rendertime_end = time.perf_counter()
+        render_times.append(rendertime_end - rendertime_start)
         #Save the image into a GIF to show the training proces
         if(not i % epochs_per_save):
             simage = visrenderer(scene).flip(1)
@@ -251,7 +256,10 @@ with tqdm(range(num_epochs)) as titer:
         loss = torch.sum((cimage - target_image)**2)
         losses.append(loss.item())
         # loss = loss_fn(cimage[...,:3].permute(0, 3, 1, 2), target_image[...,:3].permute(0, 3, 1, 2))
+        bptime_start = time.perf_counter()
         loss.backward()
+        bptime_end = time.perf_counter()
+        bp_times.append(bptime_end - bptime_start)
         optimizer.step()
         # for p in opt_props:
         #     p.data.clamp_(-10,3)
@@ -260,6 +268,8 @@ with tqdm(range(num_epochs)) as titer:
         # opt_props[3].data.clamp(0)
         titer.set_postfix(loss=loss.item(), length=opt_props[-1].item())
     
+# print(np.mean(np.array(render_times)))
+# print(np.mean(np.array(bp_times)))
 # Save GIF
 default_duration = 50
 lag = 1000
