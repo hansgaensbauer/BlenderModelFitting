@@ -64,6 +64,52 @@
         font-size: 0.9em;
         color: #777;
       }
+
+      table {
+        table-layout: fixed;
+        width: 100%;
+        border-collapse: collapse;
+      }
+
+      table td,
+      table th {
+        padding: 8px 8px;
+        border: 1px solid black;
+        text-align: center;
+      }
+      .check {
+        color: green;
+        font-weight: bold;
+        text-align: center;
+        font-size: 30pt;
+      }
+
+      .cross {
+        color: red;
+        font-weight: bold;
+        text-align: center;
+        font-size: 30pt;
+      }
+
+      .maybe {
+        color: orange;
+        font-weight: bold;
+        text-align: center;
+        font-size: 30pt;
+      }
+
+      .footnote-ref {
+        text-decoration: none;
+        font-size: 10pt;
+        vertical-align: super;
+        color: black;
+      }
+
+      .footnote {
+        font-size: 0.85em;
+        color: #555;
+        margin-top: 1em;
+      }
     </style>
   </head>
   <body>
@@ -74,72 +120,50 @@
       <p><em>By Hans Gaensbauer • April 21, 2025</em></p>
       <h2>Introduction</h2>
       <p>
-        Single image reconstruction is generally under-constrained, since the 2D
-        projection implicit in the creation of the image destroys information about depth.
-        However, for some applications, prior information about the 3D geometry
+        Single image reconstruction is generally under-constrained, since occlusion and
+        the 2D projection implicit in the creation of the image destroys information about
+        depth. However, for some applications, prior information about the 3D geometry
         drastically reduces the number of parameters required to completely describe the
         scene. For example, in industrial settings when computer vision is to be used to
         perform measurements (for verification) or localization (for pick and place) on
         parts that have a well understood but unknown shape. In these cases, general
-        purpose latent representations are too general to elegantly capture the prior
-        geometric information,but classical template matching may require too much manual
-        fine-tuning or insufficient accuracy for the application[1].
+        purpose latent representations are <i>too</i> general to elegantly capture the
+        prior geometric information, and classical template matching might require too
+        much manual fine-tuning or provide insufficient accuracy for the application [1].
       </p>
       <p>
-        I propose to use OpenSCAD scripts as 3D representations for parametric models to
-        explicitly define a parameterization of the 3D scene. OpenSCAD is a well-known
-        text-based 3D modelling program that is widely used to create “customizable”
-        models where a few key variables are explicitly defined. By replacing the OpenSCAD
-        renderer with a differential renderer, I can recover these model parameters from
-        an image by performing gradient descent on the model parameters and pose through
-        the differentiable renderer similar to the reconstruction training approach
-        described in [2], [3]. A nice example of this approach to recover the pose of a
-        completely defined mesh is given in [4].
+        This work uses 3D models in
+        <a href="https://www.blender.org/">Blender</a> to define a parameterization of the
+        3D scene. Blender is a well-known and well-supported 3D modelling and animation
+        program that has a lot of features for defining complex constraints on deformable
+        custom 3D geometry. As an example, to animate a person walking, an artist using
+        Blender will define deformations and transformations that parameterize the complex
+        movement of the model's legs as they make a walking motion. Then, a single
+        parameter can be driven by the frame number and the model will appear to take
+        steps. By replacing Blender's renderer with a differential renderer, I can recover
+        these model parameters from an image by performing gradient descent on the model
+        parameters and pose through the differentiable renderer similar to the
+        reconstruction training approach described in [2], [3].
       </p>
+      <h3>Related Work</h3>
       <p>
         There is a significant body of work that uses deformable 3D models (or large
         databases of 3D models) to fit meshes and extract the pose of target objects from
-        a single photo[5], [6], [7], [8], [9], [10], [11]. The proposed approach has
-        orders of magnitude fewer optimization parameters because I am optimizing a small
-        number of user-specified parameters rather than the position of every point on the
-        mesh. The handful of papers that do use explicitly defined low-dimensional 3D
-        parameterizations are application specific and therefore use training/inference
-        techniques that do not attempt to completely describe the 3D object [12],[13]. On
-        the other end of the spectrum, the proposed project has a lot in common with
-        classical approaches to object matching using user-specified models, with the
-        important difference that these template-matching algorithms do not leverage a
-        differentiable renderer for gradient-descent on the image data [14], [15].
+        a single photo [4-11]. The proposed approach has orders of magnitude fewer
+        optimization parameters because I am optimizing a small number of user-specified
+        parameters rather than the position of every point on the mesh. The handful of
+        papers that do use explicitly defined low-dimensional 3D parameterizations are
+        application specific and therefore use training/inference techniques that do not
+        attempt to completely describe the 3D object [12], [13]. On the other end of the
+        spectrum, the proposed project has a lot in common with classical approaches to
+        object matching using user-specified models, with the important difference that
+        these template-matching algorithms do not leverage a differentiable renderer for
+        gradient-descent on the image data [14], [15]. Finally, feature matching
+        techniques have been established as the standard approach for 3D template
+        matching, but they do not handle deformable/customizable models that would cause
+        misalignment of the features between the target and reference images.
       </p>
-      <p>
-        I will aim to compare reconstruction using explicitly parameterized models for
-        surface mounted integrated circuits, fasteners, and spur gears to conventional 3D
-        reconstruction techniques using more general latent representations to answer the
-        following questions:
-      </p>
-      <ol>
-        <li>
-          For a given accuracy, how does the size and speed of explicitly parameterized
-          reconstruction compare to traditional methods?
-        </li>
-        <li>
-          Does explicitly parameterized reconstruction generalize to real-world input
-          images better than conventional mesh fitting? Specifically, how does the
-          accuracy on a test set of real images compare?
-        </li>
-        <li>
-          Are results consistent across object type? What types of parameterizations are
-          allowable? (it seems likely that affine transformations will work better than
-          parameterizations that change, for example, the number or arrangement of certain
-          features).
-        </li>
-      </ol>
-      <p>
-        Finally, to assess whether this approach is simpler to set up than template
-        matching with a parameterized template, I will also implement a classical template
-        matching pipeline for these objects and discuss the amount of fine-tuning required
-        to use the two approaches for different classes of objects.
-      </p>
-      <h2>Mesh Fitting with Differential Rendering</h2>
+      <h2>Methods: Mesh Fitting with Differential Rendering</h2>
       <p>
         A different approach that can leverage the tools we have for machine learning is
         to use gradient descent to optimize a mesh by rendering views of that mesh that
@@ -149,7 +173,7 @@
         vertices. This approach has been described extensively and is relatively
         straightforward to implement using tools like Pytorch3D. Typically, the mesh is
         stored as a Pytorch tensor, and the 3D position of every vertex of the mesh is
-        optimized:9
+        optimized:
       </p>
       <figure>
         <img
@@ -160,10 +184,12 @@
         />
         <figcaption>
           <b>Figure 1:</b> Multiview mesh fitting using differentiable rendering. This is
-          the mesh-fitting example provided with Pytorch3D, which optimizes a per-vertex
-          distortion in order to minimize the silhouette loss for 20 different views. This
-          visualization uses a lit/textured renderer, but the optimization uses only the
-          single-channel silhouette.
+          the
+          <a href="https://pytorch3d.org/tutorials/fit_textured_mesh"
+            >mesh-fitting example provided with Pytorch3D </a
+          >, which optimizes a per-vertex distortion in order to minimize the silhouette
+          loss for 20 different views. This visualization uses a lit/textured renderer,
+          but the optimization uses only the single-channel silhouette.
         </figcaption>
       </figure>
       <p>
@@ -175,7 +201,7 @@
         and optimized. Blender is a particularly attractive choice because it is very
         tightly integrated with Python anyway, and the Blender Python API makes it easy to
         access the model and the user-defined parameters. Blender supports a variety of
-        parametric transformations that give us an intuitive way of defining degres of
+        parametric transformations that give us an intuitive way of defining degrees of
         freedom for our model.
       </p>
       <figure>
@@ -193,10 +219,10 @@
         Unfortunately, because Blender is not implemented in PyTorch, none of the mesh
         updates can be differentiated by Pytorch. This is a deeper problem inherent in any
         attempt to couple an external program with deep learning tools, since file IO in
-        general breaks the gradient computation. Fortunately, besaf cause Blender is so
-        well integrated with Python, it is possible to extract each of the transform
-        matrices associated with the applied mesh transformations. This makes it possible
-        to keep the mesh in pytorch while applying transformations that are defined in
+        general breaks the gradient computation. Fortunately, because Blender is so well
+        integrated with Python, it is possible to extract each of the transform matrices
+        associated with the user-specified mesh transformations. This makes it possible to
+        keep the mesh in Pytorch while applying transformations that are defined in
         Blender, and the final mesh in Blender can be updated after the optimization
         process.
       </p>
@@ -223,17 +249,19 @@
         number of additional transformations to the entire mesh in Object Mode. The entire
         mesh is transformed using a 4x4 matrix in homogeneous coordinates to locate the
         object within the scene.
-        <br /><br />
+      </p>
+      <p>
         In order to parameterize these transformations, Blender includes "drivers" which
-        can be used to drive transformations. For general use, drivers allow certain
-        object properties to be driven by other parameters in the model, but for our use,
-        drivers allow us to flag parts of the transformation matrix that we want to
-        optimize. For example, we can specify that we only want to vary the X/Y position
-        (and not Z) of the object on some known surface, or constrain the aspect ratio
-        while allowing the absolute size to be optimized.
-        <br /><br />
+        can be used to parameterize transformations. For general use, drivers allow
+        certain object properties to be driven by other parameters in the model, but for
+        our use, drivers allow us to flag parts of the transformation matrix that we want
+        to optimize. For example, we can specify that we only want to vary the X/Y
+        position (and not Z) of the object on some known surface, or constrain the aspect
+        ratio while allowing the absolute size to be optimized.
+      </p>
+      <p>
         While there are a miscellany of ways to communicate a specific parameterization to
-        the optimizer in Pytorch, the approach that best aligns with convention for
+        the optimizer in Pytorch, the approach that best aligns with the convention for
         drivers in normal Blender use is to define an empty "control object" that has
         custom parameters for each of the variables we wish to optimize. Then, each of the
         drivers that we define for the objects we want to optimize refer to the properties
@@ -302,7 +330,8 @@ opt_props.append(body_length)
         character smile or to scale and move certain parts of the mesh. It is possible to
         define multiple shape keys for the same vertices, in which case the final mesh is
         the weighted sum of each of the transformations.
-        <br /><br />
+      </p>
+      <p>
         To apply a shape key outside of Blender, we extract the "basis" or starting vertex
         positions and the "key" or ending vertex positions, and then compute the new mesh
         as <code>mesh = basis + key*(key-basis)</code>:
@@ -325,11 +354,11 @@ opt_props.append(body_length)
       </p>
       <h3>Blender Model Setup</h3>
       <p>
-        To create a parameterized model for this reconstruction framework, a user defines
-        an "Empty" object called "Control" that serves as a container for all of the
-        parameters, which are added as custom properties. Then, the user adds drivers or
-        shape keys to the mesh (named "Target") in order to define the specific ways in
-        which the mesh can be deformed.
+        In summary, to create a parameterized model for this reconstruction framework, a
+        user defines an "Empty" object called "Control" that serves as a container for all
+        of the parameters, which are added as custom properties. Then, the user adds
+        drivers or shape keys to the mesh (named "Target") in order to define the specific
+        ways in which the mesh can be deformed.
       </p>
       <figure>
         <video width="800" controls>
@@ -351,7 +380,7 @@ opt_props.append(body_length)
       </p>
       <h2>Parameterized Mesh Fitting</h2>
       In order to optimize the mesh using Pytorch, it is not enough to extract the
-      parameters and compute the tranformations once. Rather, we need to extract the
+      parameters and compute the transformations once. Rather, we need to extract the
       entire dependency graph and automatically re-implement it in Pytorch so that it is
       fully differentiable.
       <h3>Building a PyTorch Pipeline from Blender Parameterizations</h3>
@@ -363,7 +392,7 @@ opt_props.append(body_length)
         <li>Extract the list of drivers from the objects in the scene</li>
         <li>
           Automatically build a function that computes the drivers from the control object
-          properties in Pytoch
+          properties in Pytorch
         </li>
         <li>
           Use this function to compute an updated transformation matrix during training
@@ -414,8 +443,8 @@ def get_transform_update_string(drivers):
     return vstr
 </code></pre>
       <p>
-        As an example, for a cube with rotation and the x axis scale that are both driven
-        by a single parameter, this code produces the following output:
+        As an example, for a cube with rotation and X axis scale that are both driven by a
+        single parameter, this code produces the following output:
       </p>
       <pre><code>def update_transform():
   location = torch.zeros(3, device=device)
@@ -436,8 +465,10 @@ def get_transform_update_string(drivers):
 </code></pre>
       <p>
         In this case, <code>scale1</code> has already been defined as a global,
-        gradient-enabled tensor by the call <code>initialize_params</code>. Finally, we
-        need to implement <code>build_transform():</code>
+        gradient-enabled tensor by the call to <code>initialize_params</code>. Finally, we
+        need to implement <code>build_transform()</code>, which returns a 3x4 tensor that
+        transforms homogeneous vertex positions into non-homogeneous transformed vertex
+        positions:
       </p>
       <pre><code>def build_transform(location, rotation, scale):
   cx, cy, cz = torch.cos(rotation)
@@ -474,10 +505,6 @@ def get_transform_update_string(drivers):
   
   return upper.to(dtype=torch.float32)
 </code></pre>
-      <p>
-        This returns a 3x4 tensor that transforms homogeneous vertex positions into
-        non-homogeneous transformed vertex positions.
-      </p>
       <h3>Training</h3>
       <p>
         With all this in place, training is straightforward. In each iteration, we use
@@ -546,10 +573,11 @@ with tqdm(range(num_epochs)) as titer:
         A single transform matrix is not terribly useful on its own, since a single affine
         transformation is too simple to parameterize an interesting range of possible
         shapes. However, the driver+transform matrix approach is readily extended to more
-        complicated blender files featuring composite meshes. Each mesh in the scene can
+        complicated Blender files featuring composite meshes. Each mesh in the scene can
         have its own parameterized transformations and shape keys, and the drivers for
         these transformations can depend on properties of other meshes.
-        <br /><br />
+      </p>
+      <p>
         For example, the model of the bolt shown below consists of two cylinders: one for
         the head and one for the body of the bolt. The height and diameter of each
         cylinder are parameterized, and the body of the bolt is translated so that it
@@ -564,14 +592,14 @@ with tqdm(range(num_epochs)) as titer:
         <figcaption>
           <b>Figure 6:</b> Screen captures from Blender showing an example composite mesh
           and the custom properties for the Control object. The bolt model shown here
-          consists of two cyllinders that are individually transformed to generalize the
+          consists of two cylinders that are individually transformed to generalize the
           shape of a bolt.
         </figcaption>
       </figure>
       <p>
         The function <code>get_transform_update_string()</code> must be updated to produce
         a function that returns a list of transform matrices, one for each mesh in the
-        target collection (Blender's way of denoting a composite mesh)
+        target collection (Blender's way of denoting a composite mesh):
       </p>
       <pre><code>def get_transform_update_string(drivers):
   vstr = "def update_transform():\n"
@@ -591,7 +619,7 @@ with tqdm(range(num_epochs)) as titer:
   return vstr</code></pre>
       <p>
         The training loop now includes an inner loop that transforms each mesh in the
-        scene.
+        scene:
       </p>
       <pre><code>with tqdm(range(num_epochs)) as titer:
   for i in titer:
@@ -620,13 +648,14 @@ with tqdm(range(num_epochs)) as titer:
 </code></pre>
       <p>
         This code can accept any number of objects in the composite mesh. Training for 300
-        epochs gives the following results:
+        iterations gives the following results:
       </p>
       <figure>
         <img src="Examples/outputs/location_training_process.gif" width="312" />
         <img src="Examples/outputs/bolt_demo_training_loss.png" width="312" />
         <figcaption>
-          <b>Figure 7:</b> Training animation and loss for composite mesh fitting, including 2D location.
+          <b>Figure 7:</b> Training animation and loss for composite mesh fitting,
+          including 2D location.
         </figcaption>
       </figure>
       <p>
@@ -637,7 +666,7 @@ with tqdm(range(num_epochs)) as titer:
         the mesh and target object are close enough that the "fuzziness" from the
         differentiable renderer has a significant amount of overlap. In these cases, the
         model will sometimes "cheat" by attempting to shrink the target mesh to reduce the
-        error in the pixels that the target mesh is occupyting:
+        error in the pixels that the target mesh is occupying:
       </p>
       <figure>
         <img
@@ -649,39 +678,38 @@ with tqdm(range(num_epochs)) as titer:
           width="312"
         />
         <figcaption>
-          <b>Figure 8:</b> Training can fail when there is insufficient overlap between the
-          target silhouette and the rendering of the starting mesh because the optimizer 
-          learns to "crush" the mesh to a point. The loss converges to the error between 
-          an empty scene and the target rendering.
+          <b>Figure 8:</b> Training can fail when there is insufficient overlap between
+          the target silhouette and the rendering of the starting mesh because the
+          optimizer learns to "crush" the mesh to a point. The loss converges to the error
+          between an empty scene and the target rendering.
         </figcaption>
       </figure>
       <p>
         Notice that the loss "converges" to a large nonzero value. One possible fix is to
         blur the images so there is always some overlap. Anecdotally, doing this through
         the differential renderer produced strange side effects, so instead I implemented
-        it using kornia.gaussian_blur2d with a standard devation of 10 and a kernel size
+        it using kornia.gaussian_blur2d with a standard deviation of 10 and a kernel size
         of (101,101). The new target image looks like this:
       </p>
       <figure>
         <img src="Examples/outputs/bolt_blur.png" width="312" />
         <figcaption>
-          <b>Figure 9:</b> The target and starting mesh are blurred with a wide kernel to 
+          <b>Figure 9:</b> The target and starting mesh are blurred with a wide kernel to
           incentivise the optimizer to align the mesh and the target silhouette.
         </figcaption>
       </figure>
       <p>
-        And the results for the same mesh fitting problem and hyperparameters are much
-        better:
+        The results for the same mesh fitting problem and hyperparameters are much better:
       </p>
       <figure>
         <img src="Examples/outputs/location_training_process_translate.gif" width="312" />
         <img src="Examples/outputs/bolt_demo_training_loss_translate.png" width="312" />
         <figcaption>
-          <b>Figure 10:</b> Optimization with Gaussian filtered silhouettes. The same initial 
-          conditions used in Figure 8 result in correct convergence when the silhouettes are
-          blurred. Furtheremore, training proceedes slightly more quickly, possibly because 
-          the blurred silhouettes produce better gradients for aligning the silhouettes even once
-          the silhouettes have some overlap. 
+          <b>Figure 10:</b> Optimization with Gaussian filtered silhouettes. The same
+          initial conditions used in Figure 8 result in correct convergence when the
+          silhouettes are blurred. Furthermore, training proceeds slightly more quickly,
+          possibly because the blurred silhouettes produce better gradients for aligning
+          the silhouettes even once the silhouettes have some overlap.
         </figcaption>
       </figure>
       <p>
@@ -706,22 +734,24 @@ with tqdm(range(num_epochs)) as titer:
         <img src="Examples/bolt_image.png" width="312" />
         <img src="Examples/outputs/bolt_photo_mask.png" width="312" />
         <figcaption>
-          <b>Figure 11:</b> A photo of a bolt and the extracted silhouette used for mesh fitting.
+          <b>Figure 11:</b> A photo of a bolt and the extracted silhouette used for mesh
+          fitting.
         </figcaption>
       </figure>
       <p>
         Since this photo was taken at a different angle than the angle of the camera in
         the renderer, it is not possible to get a perfect match. However, the training
-        does still converge:
+        does still approach the correct geometry:
       </p>
       <figure>
         <img src="Examples/outputs/photo_training_process.gif" width="312" />
         <img src="Examples/outputs/photo_demo_training_loss_badangle.png" width="312" />
         <figcaption>
-          <b>Figure 12:</b> "Naive" mesh fitting on the photo in Figure 11. Because the photo
-          was taken with an unkown camera position, the ground plane (and thus, the central axis of the bolt)
-          are not aligned and a perfect fit is not possible. Note that while the original photo
-          is shown for clarity, only the silhouette is used for training.
+          <b>Figure 12:</b> "Naive" mesh fitting on the photo in Figure 11. Because the
+          photo was taken with an unknown camera position, the ground plane (and thus, the
+          central axis of the bolt) are not aligned and a perfect fit is not possible.
+          Note that while the original photo is shown for clarity, only the silhouette is
+          used for training.
         </figcaption>
       </figure>
       <p>
@@ -751,14 +781,14 @@ loss = torch.sum((cimage - target_image)**2)</code></pre>
       <p>
         Here roll and elevation are tensors with <code>requires_grad=True</code>. It's
         worth noting that we cannot also optimize the depth, since there is no scale
-        information in the photo. Training for 100 epochs:
+        information in the photo. Training for 100 iterations:
       </p>
       <figure>
         <img src="Examples/outputs/photo_training_process_camera.gif" width="312" />
         <img src="Examples/outputs/photo_demo_training_loss_camera.png" width="312" />
         <figcaption>
-          <b>Figure 13:</b> The same mesh fitting problem where the camera roll and elevation are
-          also optimized. The learning rate has been increased to 0.12.
+          <b>Figure 13:</b> The same mesh fitting problem where the camera roll and
+          elevation are also optimized. The learning rate has been increased to 0.12.
         </figcaption>
       </figure>
       <p>
@@ -766,16 +796,176 @@ loss = torch.sum((cimage - target_image)**2)</code></pre>
         the initial state since it changes very quickly at the start of training.
       </p>
       <h2>Comparison to Existing Techniques</h2>
+      <p>
+        Among the various techniques studied here, this approach is the only one that can
+        simultaneously handle variable/deformable geometry <i>and</i> single images. The
+        catch is that this is only because it "cheats" with the prior information about
+        the scene encoded in the parameterization. Most of the effort required to get this
+        approach working (and much of what makes it valuable and novel) is the integration
+        with Blender, which converts the normally arduous and subtle task of constraining
+        the optimization process into the extensively documented and relatively convenient
+        process of building a parametric model in widely used and free modelling software.
+      </p>
+      <p>
         Compared to generalized mesh fitting approaches, this technique has far fewer free
-        variables and thus can succeed in correctly fitting a mesh to otherwise under-constrained
-        situations like single images. However, the gradient descent step requires hundreds of
-        iterations, each requiring a call to the renderer. On a GTX 1650 GPU, this can take several
-        minutes, and this is too slow for real-time applications working with video.
-      <h2>Conclusion</h2>
-      <ul>
-        <li>Not ideal using silhouette</li>
-        <li>Very slow</li>
-      </ul>
+        variables and thus can succeed in correctly fitting a mesh to otherwise
+        under-constrained situations like single images. While general single-image
+        reconstruction approaches rely on a training dataset and neural networks to learn
+        an acceptable parameterization [2], this approach skips that step in favor of an
+        explicitly defined latent space. For applications where the parameterization is
+        not obvious but training data is available, learned representations are a better
+        choice. In situations where the the parameterization is obvious, it makes more
+        sense to provide it to the optimizer as described here.
+      </p>
+      <p>
+        The "template matching" aspect of this project can be done more quickly using SIFT
+        feature matching, which does not require the rendering step, however, these
+        techniques cannot handle deformable or otherwise parameterized meshes. Because
+        backpropagation and rendering for full mesh optimization is highly parallel, the
+        speedup associated with the smaller set of free variables isn't as significant as
+        I had expected. Judging from the results of these experiments on a GTX 1650 GPU
+        (80ms rendering time), I expect a carefully tuned version of this approach with
+        better hardware could be "near real time" like SIFT [16], but it's not there in
+        its current state.
+      </p>
+      <figure>
+        <table>
+          <tr>
+            <th></th>
+            <th>Single Image Reconstruction</th>
+            <th>Feature Matching</th>
+            <th>Mesh Fitting</th>
+            <th>Parameterized Reconstruction</th>
+          </tr>
+          <tr>
+            <th>Works with Single Images</th>
+            <td class="check">✔</td>
+            <td class="check">✔</td>
+            <td class="cross">✖</td>
+            <td class="check">✔</td>
+          </tr>
+          <tr>
+            <th>Works with Photos</th>
+            <td class="maybe">
+              ~<sup><a href="#footnote1" class="footnote-ref">1</a></sup>
+            </td>
+            <td class="check">✔</td>
+            <td class="check">✔</td>
+            <td class="check">✔</td>
+          </tr>
+          <tr>
+            <th>Extract 2D Position</th>
+            <td class="check">✔</td>
+            <td class="check">✔</td>
+            <td class="check">✔</td>
+            <td class="check">✔</td>
+          </tr>
+          <tr>
+            <th>Generalizes to New Shapes</th>
+            <td class="cross">✖</td>
+            <td class="cross">✖</td>
+            <td class="check">✔</td>
+            <td class="check">✔</td>
+          </tr>
+          <tr>
+            <th>Degree of Customization Required</th>
+            <td>High (Custom Dataset [2-3,6,17])</td>
+            <td>Very Low</td>
+            <td>None [16]</td>
+            <td>Some (Custom Model)</td>
+          </tr>
+          <tr>
+            <th>Speed</th>
+            <td>
+              Near Real-Time<sup><a href="#footnote2" class="footnote-ref">2</a></sup>
+            </td>
+            <td>Near Real-Time [18]</td>
+            <td>Not Real Time</td>
+            <td>Not Real Time</td>
+          </tr>
+        </table>
+        <p id="footnote1" class="footnote">1. Sometimes - see [2] and [17]</p>
+        <p id="footnote2" class="footnote">
+          2. Scales quadratically with image resolution [17]
+        </p>
+        <figcaption>
+          <b>Figure 14: </b> A comparison of several different techniques for 3D template
+          matching and reconstruction.
+        </figcaption>
+      </figure>
+
+      <h2>Conclusion and Limitations</h2>
+      <p>
+        This technique can fit parametric, composite models from Blender to single photos
+        of real objects in about 100 iterations. All of the experiments described here
+        were run on a single GTX 1650 GPU, which is a low-cost ($100 on Ebay) GPU that is
+        not competitive with GPUs used for research today, so it is likely that the
+        rendering times I had on the GTX 1650 are longer than they would be on a modern
+        GPU. Furthermore, time constraints and the limited availability of the (borrowed)
+        compute resources meant that the training hyperparameters are probably not
+        optimal, and I was only able to set up a few mesh fitting problems. It would be
+        nice to try this technique on more models to get a more general picture of its
+        performance across a wider variety of setups.
+      </p>
+      <p>
+        In addition to these "real-world" considerations, there are a few inherent
+        limitations to this technique as presented. First, while object transforms,
+        drivers, and shape keys capture a wide variety of Blender parameterizations, they
+        don't come close to covering the whole range of possible constraints that Blender
+        allows. Because every Blender feature I include has to be dynamically rebuilt in
+        Pytorch to be differentiable, the code to handle it in the optimization has to be
+        developed manually. In my opinion, the biggest missing feature in the current
+        presentation is
+        <a
+          href="https://docs.blender.org/manual/en/latest/animation/introduction.html#rigging"
+          >rigging</a
+        >, which is used to define flexible joints for posing characters in 3D animation.
+        A rigging implementation in Pytorch would allow the differentiable rendering
+        pipeline to be used to extract 3D pose from photos of figures - a very interesting
+        problem with a wide range of real-world applications.
+      </p>
+      <p>
+        Furthermore, another limitation of this approach is that it does not significantly
+        reduce the amount of computation required compared to other techniques with much
+        larger numbers of free parameters. The gradient descent step requires hundreds of
+        iterations, each requiring a call to the renderer. On a GTX 1650 GPU, this can
+        take several minutes, and this is too slow for real-time applications working with
+        video. Real-time application of this technique may still be possible with a better
+        GPU and more fine-tuning. Practically, the most significant impact of the low
+        dimensionality of the latent space is that it is possible to reliably and
+        accurately fit the 3D mesh to a single 2D image, which is not possible with
+        general mesh fitting techniques. It is possible that it is faster to uniformly
+        sample the entire parameter space and pick the model with the lowest loss
+        (skipping the backpropagation step altogether), especially for models with only a
+        few parameters like the examples shown here. This would have the rather important
+        advantage that Blender's built-in renderer (and all of Blender's other features)
+        could be used. This ultimately depends on how much of the iteration time is spend
+        on rendering, and how much is spent on backpropagation: for the bolt example with
+        the real image, rendering took 78ms on average, and backpropagation took 28ms on
+        average.
+      </p>
+      <p>
+        I claim that this pipeline (or a version of it) is the best option for a multitude
+        of industrial vision problems where the range of variability in the target objects
+        is well understood ahead of time. For example, measuring the height of electrical
+        components with a known footprint, identifying ice cream sandwiches with too much
+        (or too little!) filling, or sorting recyclable bottles based on their shape or
+        appearance.
+      </p>
+      <figure>
+        <img src="Examples/cap.gif" , width="170" />
+        <img src="Examples/sandwich.gif" , width="400" />
+        <img src="Examples/can.gif" , width="170" />
+        <figcaption><b>Figure 15:</b> A few possible applications.</figcaption>
+      </figure>
+      <h2>Acknowledgements</h2>
+      <p>
+        I would like to thank <a href="https://github.com/jamelofs">James Elofson</a> for
+        making his server and GPU available to run the experiments in this project.
+      </p>
+      <h2>Code</h2>
+      All of the code is available on
+      <a href="https://github.com/hansgaensbauer/BlenderModelFitting">Github</a>.
       <h2>References</h2>
       <ol>
         <li>
@@ -885,9 +1075,37 @@ loss = torch.sum((cimage - target_image)**2)</code></pre>
             >https://dspace.mit.edu/handle/1721.1/11589</a
           >
         </li>
+
+        <li>
+          D. G. Lowe, “Distinctive Image Features from Scale-Invariant Keypoints,”
+          International Journal of Computer Vision, vol. 60, no. 2, pp. 91–110, Nov. 2004,
+          doi:
+          <a href="10.1023/B:VISI.0000029664.99615.94"
+            >10.1023/B:VISI.0000029664.99615.94</a
+          >.
+        </li>
+
+        <li>
+          V. Sitzmann, M. Zollhoefer, and G. Wetzstein, “Scene Representation Networks:
+          Continuous 3D-Structure-Aware Neural Scene Representations,” in Advances in
+          Neural Information Processing Systems, Curran Associates, Inc., 2019. Accessed:
+          May 03, 2025. [Online]. Available:
+          <a
+            href="https://papers.nips.cc/paper_files/paper/2019/hash/b5dc4e5d9b495d0196f61d45b26ef33e-Abstract.html"
+          >
+            https://dspace.mit.edu/handle/1721.1/11589 </a
+          >.
+        </li>
+        <li>
+          M. Kennerley, “A Comparison of SIFT, SURF and ORB on OpenCV,” Medium. Accessed:
+          May 03, 2025. [Online]. Available:
+          <a
+            href="https://mikhail-kennerley.medium.com/a-comparison-of-sift-surf-and-orb-on-opencv-59119b9ec3d0"
+          >
+            https://mikhail-kennerley.medium.com/a-comparison-of-sift-surf-and-orb-on-opencv-59119b9ec3d0 </a
+          >.
+        </li>
       </ol>
     </article>
-
-    <footer>&copy; 2025 Your Name or Blog Title</footer>
   </body>
 </html>
